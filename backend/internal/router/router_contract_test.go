@@ -159,6 +159,8 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 			"/api/v1/admin/project/get",
 			"/api/v1/admin/project/delete",
 			"/api/v1/admin/project/search",
+			"/api/v1/admin/project/gitlab/remote-search",
+			"/api/v1/admin/project/gitlab/group-search",
 			"/api/v1/admin/project/web-urls/exists":
 			expectedStatus = http.StatusBadRequest
 		case "/api/v1/admin/llm-model/create",
@@ -177,9 +179,10 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 
 func newContractRouter() *gin.Engine {
 	return New(Dependencies{
-		AuthHandler:     NewAuthHandlerForTest(),
-		ProjectHandler:  handler.NewProjectHandler(&contractProjectService{}),
-		LLMModelHandler: handler.NewLLMModelHandler(&contractLLMModelService{}),
+		AuthHandler:          NewAuthHandlerForTest(),
+		ProjectHandler:       handler.NewProjectHandler(&contractProjectService{}),
+		ProjectGitLabHandler: handler.NewProjectGitLabHandler(&contractProjectGitLabService{}),
+		LLMModelHandler:      handler.NewLLMModelHandler(&contractLLMModelService{}),
 		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
 			subject: &service.AuthSubject{
 				UserID:   1,
@@ -255,6 +258,16 @@ func (s *contractProjectService) Search(ctx context.Context, query service.Proje
 
 func (s *contractProjectService) WebURLExists(ctx context.Context, webURL string, excludeID uint) (bool, error) {
 	return false, service.ErrInvalidProjectInput
+}
+
+type contractProjectGitLabService struct{}
+
+func (s *contractProjectGitLabService) SearchProjects(ctx context.Context, input service.GitLabSearchInput) ([]service.GitLabProject, error) {
+	return nil, service.ErrInvalidGitLabInput
+}
+
+func (s *contractProjectGitLabService) SearchGroups(ctx context.Context, input service.GitLabSearchInput) ([]service.GitLabGroup, error) {
+	return nil, service.ErrInvalidGitLabInput
 }
 
 type contractLLMModelService struct{}

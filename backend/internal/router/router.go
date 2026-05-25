@@ -14,11 +14,12 @@ type routeDef struct {
 }
 
 type Dependencies struct {
-	AuthHandler     *handler.AuthHandler
-	ProjectHandler  *handler.ProjectHandler
-	LLMModelHandler *handler.LLMModelHandler
-	WebhookHandler  *handler.WebhookHandler
-	AuthMiddleware  gin.HandlerFunc
+	AuthHandler          *handler.AuthHandler
+	ProjectHandler       *handler.ProjectHandler
+	ProjectGitLabHandler *handler.ProjectGitLabHandler
+	LLMModelHandler      *handler.LLMModelHandler
+	WebhookHandler       *handler.WebhookHandler
+	AuthMiddleware       gin.HandlerFunc
 }
 
 func New(deps Dependencies) *gin.Engine {
@@ -51,10 +52,9 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 	admin.Use(deps.AuthMiddleware)
 	admin.GET("/auth/me", deps.AuthHandler.Me)
 	registerProjectRoutes(admin, deps.ProjectHandler)
+	registerProjectGitLabRoutes(admin, deps.ProjectGitLabHandler)
 	registerLLMModelRoutes(admin, deps.LLMModelHandler)
 	registerRoutes(admin, []routeDef{
-		{http.MethodPost, "/project/gitlab/remote-search"},
-		{http.MethodPost, "/project/gitlab/group-search"},
 		{http.MethodGet, "/project/review-prompt/get"},
 		{http.MethodGet, "/project/review-prompt/default"},
 		{http.MethodPost, "/project/review-prompt/update"},
@@ -144,6 +144,11 @@ func registerProjectRoutes(group *gin.RouterGroup, projectHandler *handler.Proje
 	group.POST("/project/delete", projectHandler.Delete)
 	group.GET("/project/search", projectHandler.Search)
 	group.POST("/project/web-urls/exists", projectHandler.WebURLExists)
+}
+
+func registerProjectGitLabRoutes(group *gin.RouterGroup, gitLabHandler *handler.ProjectGitLabHandler) {
+	group.POST("/project/gitlab/remote-search", gitLabHandler.RemoteSearch)
+	group.POST("/project/gitlab/group-search", gitLabHandler.GroupSearch)
 }
 
 func registerLLMModelRoutes(group *gin.RouterGroup, llmModelHandler *handler.LLMModelHandler) {

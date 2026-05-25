@@ -10,6 +10,7 @@ import (
 	"github.com/Lenoud/ai-review-gitlab/backend/internal/handler"
 	"github.com/Lenoud/ai-review-gitlab/backend/internal/llm"
 	"github.com/Lenoud/ai-review-gitlab/backend/internal/middleware"
+	platformgitlab "github.com/Lenoud/ai-review-gitlab/backend/internal/platform/gitlab"
 	"github.com/Lenoud/ai-review-gitlab/backend/internal/repository"
 	"github.com/Lenoud/ai-review-gitlab/backend/internal/router"
 	"github.com/Lenoud/ai-review-gitlab/backend/internal/service"
@@ -55,18 +56,21 @@ func main() {
 	}
 
 	projectSvc := service.NewProjectService(repository.NewProjectRepository(db))
+	gitLabSvc := service.NewGitLabService(platformgitlab.NewServiceAdapter(nil))
 	reviewTaskSvc := service.NewReviewTaskService(repository.NewProjectRepository(db), repository.NewReviewTaskRepository(db), service.ReviewTaskOptions{})
 	llmModelSvc := service.NewLLMModelService(repository.NewLLMModelRepository(db), llm.NewOpenAICompatibleChecker(nil))
 	authHandler := handler.NewAuthHandler(authSvc)
 	projectHandler := handler.NewProjectHandler(projectSvc)
+	projectGitLabHandler := handler.NewProjectGitLabHandler(gitLabSvc)
 	llmModelHandler := handler.NewLLMModelHandler(llmModelSvc)
 	webhookHandler := handler.NewWebhookHandler(reviewTaskSvc)
 	r := router.New(router.Dependencies{
-		AuthHandler:     authHandler,
-		ProjectHandler:  projectHandler,
-		LLMModelHandler: llmModelHandler,
-		WebhookHandler:  webhookHandler,
-		AuthMiddleware:  middleware.JWTAuth(authSvc),
+		AuthHandler:          authHandler,
+		ProjectHandler:       projectHandler,
+		ProjectGitLabHandler: projectGitLabHandler,
+		LLMModelHandler:      llmModelHandler,
+		WebhookHandler:       webhookHandler,
+		AuthMiddleware:       middleware.JWTAuth(authSvc),
 	})
 	if err := r.Run(cfg.Server.Address()); err != nil {
 		log.Fatalf("run server: %v", err)
