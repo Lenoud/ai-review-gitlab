@@ -73,51 +73,51 @@ handler → service → repository → model
 
 **核心审查**：
 
-| 表名 | 说明 |
+| 表名 | 关键字段 |
 |------|------|
-| `project` | 项目配置（webUrl, platform, accessToken, extensions, reviewPromptTemplate, imEnabled, htmlReportEnabled 等） |
-| `push_review_log` | Push 审查日志（projectId, author, branch, score, additions, deletions, shareToken） |
-| `merge_request_review_log` | MR 审查日志（projectId, author, sourceBranch, targetBranch, score, shareToken） |
-| `ai_review_trace` | AI 调用追踪（prompt, response, provider, modelCode） |
-| `llm_model` | LLM 模型配置（provider, apiBaseUrl, apiKey, maxTokens, isDefault） |
+| `project` | id, name, description, webUrl, platform, accessToken, imEnabled, imRobotId, imAtMemberEnabled, imAtMemberScoreThreshold, aiReviewEnabled, templateId, extensions, reviewEventTypes, reviewPromptTemplate, htmlReportEnabled, deepReviewEnabled（字段保留但 V1 不使用） |
+| `push_review_log` | id, projectId, projectName, author, authorIdentity, authorDisplayName, branch, commitMessages, commits(JSON), score, additions, deletions, lastCommitUrl, shareToken, shareTokenExpiresAt |
+| `merge_request_review_log` | id, projectId, projectName, author, authorIdentity, authorDisplayName, sourceBranch, targetBranch, commitMessages, score, additions, deletions, lastCommitId, url, shareToken, shareTokenExpiresAt |
+| `ai_review_trace` | id, reviewEventType, reviewEventId, prompt, response, provider, modelCode |
+| `llm_model` | id, provider, modelCode, apiBaseUrl, apiKey, maxTokens, isDefault |
 
 **通知**：
 
-| 表名 | 说明 |
+| 表名 | 关键字段 |
 |------|------|
-| `im_robot` | IM 机器人（platform, webhookUrl, secret, enabled） |
-| `member_im_mapping` | Git 用户 → IM 用户映射（gitUsername, platform, imUserId） |
+| `im_robot` | id, platform, name, webhookUrl, secret, enabled |
+| `member_im_mapping` | id, gitUsername, platform, imUserId, displayName |
 
 **模板**：
 
-| 表名 | 说明 |
+| 表名 | 关键字段 |
 |------|------|
-| `project_template` | 项目模板（name, extensions, reviewPromptTemplate） |
-| `project_template_review_rule` | 审查规则（templateId, globPatterns, content, priority） |
+| `project_template` | id, name, description, extensions, reviewPromptTemplate |
+| `project_template_review_rule` | id, templateId, name, description, globPatterns, content, priority, enabled |
 
 **定时分析**：
 
-| 表名 | 说明 |
+| 表名 | 关键字段 |
 |------|------|
-| `project_analysis_plan` | 分析计划（projectId, cronExpression, prompt, enabled, imEnabled） |
-| `project_analysis_plan_execution_log` | 执行日志（planId, status, resultContent, durationMs） |
+| `project_analysis_plan` | id, projectId, name, prompt, cronExpression, enabled, imEnabled, imRobotId, htmlReportEnabled |
+| `project_analysis_plan_execution_log` | id, planId(nullable), projectId(nullable), status, startedAt, completedAt, durationMs, resultContent, resultActions, shareToken, shareTokenExpiresAt, errorMessage, errorStack |
 
 **RBAC**：
 
-| 表名 | 说明 |
+| 表名 | 关键字段 |
 |------|------|
-| `sys_user` | 用户（username, passwordHash, nickname） |
-| `sys_role` | 角色（code, name, isSystem） |
-| `sys_permission` | 权限（code, name, type, parentId, path, icon, sort） |
-| `sys_user_role` | 用户角色关联 |
-| `sys_role_permission` | 角色权限关联 |
+| `sys_user` | id, username, passwordHash, nickname, remark |
+| `sys_role` | id, code, name, isSystem, remark |
+| `sys_permission` | id, code, name, type, parentId, path, icon, sort, visible, remark |
+| `sys_user_role` | id, userId, roleId |
+| `sys_role_permission` | id, roleId, permissionId |
 
 **系统**：
 
-| 表名 | 说明 |
+| 表名 | 关键字段 |
 |------|------|
-| `settings` | 系统配置（key, value JSON） |
-| `sys_log` | 系统日志（level, module, action, message, detail） |
+| `settings` | id, key, value(JSON) |
+| `sys_log` | id, level, module, action, message, detail, errorStack |
 
 ### 不建的表
 
@@ -213,7 +213,9 @@ reviewHandler := handler.NewReviewHandler(reviewService)
 
 ---
 
-## 4. API 接口清单（约 75 个）
+## 4. API 接口清单（约 80 个）
+
+分页请求参数统一约定：`page`（从 0 开始）、`size`（每页数量，默认 20）、`sort`（格式 `field,direction`，如 `createdAt,desc`）。
 
 ### 4.1 开放接口（无需认证）
 
@@ -222,7 +224,7 @@ reviewHandler := handler.NewReviewHandler(reviewService)
 | POST | `/api/v1/open/auth/login` | 登录 |
 | POST | `/api/v1/open/auth/refresh` | 刷新 Token |
 | POST | `/api/v1/open/auth/logout` | 登出 |
-| POST | `/review/webhook` | 接收 GitLab Webhook |
+| POST | `/review/webhook` | 接收 GitLab Webhook（兼容原版路径） |
 | GET | `/api/v1/open/system/info` | 公开系统信息 |
 | GET | `/api/v1/open/code-review-report` | 分享链接查看代码审查报告 |
 | GET | `/api/v1/open/analysis-report` | 分享链接查看分析报告 |
@@ -232,14 +234,19 @@ reviewHandler := handler.NewReviewHandler(reviewService)
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | `/api/v1/admin/project/create` | 创建项目 |
+| POST | `/api/v1/admin/project/batch-create` | 批量创建项目 |
 | POST | `/api/v1/admin/project/update` | 更新项目 |
 | GET | `/api/v1/admin/project/get` | 查询项目 |
 | POST | `/api/v1/admin/project/delete` | 删除项目 |
 | GET | `/api/v1/admin/project/search` | 搜索项目 |
 | POST | `/api/v1/admin/project/gitlab/remote-search` | GitLab 远程项目列表 |
+| POST | `/api/v1/admin/project/gitlab/group-search` | GitLab 分组搜索 |
 | POST | `/api/v1/admin/project/web-urls/exists` | 检测 URL 是否已存在 |
-| GET | `/api/v1/admin/project/review-prompt/get` | 获取 Review 提示词 |
+| GET | `/api/v1/admin/project/review-prompt/get` | 获取项目 Review 提示词 |
+| GET | `/api/v1/admin/project/review-prompt/default` | 获取默认 Review 提示词 |
 | POST | `/api/v1/admin/project/review-prompt/update` | 更新 Review 提示词 |
+| POST | `/api/v1/admin/project/review-prompt/delete` | 删除项目自定义提示词 |
+| POST | `/api/v1/admin/project/review-prompt/test` | 测试提示词渲染 |
 
 ### 4.3 审查日志
 
@@ -250,11 +257,20 @@ reviewHandler := handler.NewReviewHandler(reviewService)
 | POST | `/api/v1/admin/push-review-log/delete` | 删除 |
 | GET | `/api/v1/admin/push-review-log/authors` | 提交者列表 |
 | GET | `/api/v1/admin/push-review-log/project-names` | 项目名称列表 |
+| POST | `/api/v1/admin/push-review-log/generate-share-token/{logId}` | 生成分享 Token |
 | GET | `/api/v1/admin/merge-request-review-log/get` | 查询 MR 审查日志 |
 | GET | `/api/v1/admin/merge-request-review-log/search` | 搜索 MR 审查日志 |
 | POST | `/api/v1/admin/merge-request-review-log/delete` | 删除 |
 | GET | `/api/v1/admin/merge-request-review-log/authors` | 提交者列表 |
 | GET | `/api/v1/admin/merge-request-review-log/project-names` | 项目名称列表 |
+| POST | `/api/v1/admin/merge-request-review-log/generate-share-token/{logId}` | 生成分享 Token |
+
+### 4.4 AI 审查追踪
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/v1/admin/ai-review-trace/create` | 创建追踪记录 |
+| GET | `/api/v1/admin/ai-review-trace/get` | 查询追踪记录 |
 
 ### 4.4 LLM 模型管理
 
@@ -343,12 +359,13 @@ reviewHandler := handler.NewReviewHandler(reviewService)
 | GET | `/api/v1/admin/role/menu-permissions` | 菜单权限列表 |
 | GET | `/api/v1/admin/auth/me` | 当前用户 |
 
-### 4.11 统计 & 系统
+### 4.12 统计 & 系统
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/v1/admin/stats` | 统计数据 |
 | GET | `/api/v1/admin/member/commit-summary` | 成员提交统计 |
+| GET | `/api/v1/admin/sys-log/get` | 查询单条系统日志 |
 | GET | `/api/v1/admin/sys-log/search` | 系统日志搜索 |
 | GET | `/api/v1/admin/system/info` | 系统信息 |
 | GET | `/api/v1/admin/system/config` | 系统配置 |
@@ -454,13 +471,18 @@ RBAC 路由组（需要特定权限）
 |------|------|------|
 | Webhook 异步 | goroutine + semaphore.Weighted | 防止大量 Webhook 同时打满 LLM API |
 | 定时任务 | robfig/cron/v3 | 进程内调度，从数据库动态加载计划 |
+| Cron 兼容性 | 代码中做 Quartz → 标准 cron 转换 | init.sql 中 cronExpression 注释为 Quartz 格式。robfig/cron 不支持 Quartz 的 `?` 和 `周 1-7`。在加载时自动转换：`?` → `*`，周字段 `1-7` → `0-6` |
 | LLM 调用 | 非流式，单次 /chat/completions | V1 只做审查和分析，不需要流式 |
 | 密码存储 | golang.org/x/crypto/bcrypt | 与原版一致 |
 | 数据库迁移 | golang-migrate/migrate | 应用启动时自动执行 |
 | HTML 报告 | LLM 生成完整 HTML，存文件系统 | 与原版一致，无模板文件 |
+| HTML 报告存储 | 定义 HtmlReportStorage 接口 | V1 实现为本地文件系统，后续可切换到 S3/MinIO。接口隔离实现 |
 | 分享 Token | UUID，7 天过期，存数据库 | 与原版一致 |
+| 项目代码拉取 | 调用系统 git 命令 | 比 go-git 更稳定，支持所有 Git 特性。代码存储在 `{data_dir}/projects/{projectId}/`。大型仓库不特殊处理，自然克隆 |
+| Graceful shutdown | 监听 SIGTERM，等待进行中的 Webhook 和 cron 任务完成 | 使用 `sync.WaitGroup` 跟踪进行中的 goroutine，shutdown 时 Wait 或超时强制退出 |
+| 应急管理员密码 | config.yaml 中明文 + 支持环境变量覆盖 | 环境变量 `ADMIN_PASSWORD` 优先于配置文件，避免密码意外提交到版本库 |
 
-### Go 依赖（10 个）
+### Go 依赖（11 个）
 
 ```
 github.com/gin-gonic/gin            # HTTP 框架
