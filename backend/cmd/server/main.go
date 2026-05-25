@@ -59,6 +59,7 @@ func main() {
 	projectSvc := service.NewProjectService(repository.NewProjectRepository(db))
 	gitLabSvc := service.NewGitLabService(platformgitlab.NewServiceAdapter(nil))
 	reviewTaskSvc := service.NewReviewTaskService(repository.NewProjectRepository(db), repository.NewReviewTaskRepository(db), service.ReviewTaskOptions{})
+	reviewLogSvc := service.NewReviewLogService(repository.NewReviewLogRepository(db))
 	llmModelSvc := service.NewLLMModelService(repository.NewLLMModelRepository(db), llm.NewOpenAICompatibleChecker(nil))
 	workerCtx, stopWorker := context.WithCancel(context.Background())
 	var workerRunner *worker.Runner
@@ -77,6 +78,7 @@ func main() {
 			repository.NewLLMModelRepository(db),
 			platformgitlab.NewServiceAdapter(nil),
 			llm.NewOpenAICompatibleClient(nil),
+			repository.NewReviewLogRepository(db),
 		)
 		workerRunner = worker.NewRunner(reviewWorkerSvc, worker.RunnerOptions{
 			WorkerID:      cfg.Worker.ID,
@@ -96,12 +98,14 @@ func main() {
 	projectHandler := handler.NewProjectHandler(projectSvc)
 	projectGitLabHandler := handler.NewProjectGitLabHandler(gitLabSvc)
 	llmModelHandler := handler.NewLLMModelHandler(llmModelSvc)
+	reviewLogHandler := handler.NewReviewLogHandler(reviewLogSvc)
 	webhookHandler := handler.NewWebhookHandler(reviewTaskSvc)
 	r := router.New(router.Dependencies{
 		AuthHandler:          authHandler,
 		ProjectHandler:       projectHandler,
 		ProjectGitLabHandler: projectGitLabHandler,
 		LLMModelHandler:      llmModelHandler,
+		ReviewLogHandler:     reviewLogHandler,
 		WebhookHandler:       webhookHandler,
 		AuthMiddleware:       middleware.JWTAuth(authSvc),
 	})

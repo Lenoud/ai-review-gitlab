@@ -18,6 +18,7 @@ type Dependencies struct {
 	ProjectHandler       *handler.ProjectHandler
 	ProjectGitLabHandler *handler.ProjectGitLabHandler
 	LLMModelHandler      *handler.LLMModelHandler
+	ReviewLogHandler     *handler.ReviewLogHandler
 	WebhookHandler       *handler.WebhookHandler
 	AuthMiddleware       gin.HandlerFunc
 }
@@ -54,6 +55,7 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 	registerProjectRoutes(admin, deps.ProjectHandler)
 	registerProjectGitLabRoutes(admin, deps.ProjectGitLabHandler)
 	registerLLMModelRoutes(admin, deps.LLMModelHandler)
+	registerReviewLogRoutes(admin, deps.ReviewLogHandler)
 	registerRoutes(admin, []routeDef{
 		{http.MethodGet, "/project/review-prompt/get"},
 		{http.MethodGet, "/project/review-prompt/default"},
@@ -61,14 +63,10 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 		{http.MethodPost, "/project/review-prompt/delete"},
 		{http.MethodPost, "/project/review-prompt/test"},
 
-		{http.MethodGet, "/push-review-log/get"},
-		{http.MethodGet, "/push-review-log/search"},
 		{http.MethodPost, "/push-review-log/delete"},
 		{http.MethodGet, "/push-review-log/authors"},
 		{http.MethodGet, "/push-review-log/project-names"},
 		{http.MethodPost, "/push-review-log/generate-share-token/:logId"},
-		{http.MethodGet, "/merge-request-review-log/get"},
-		{http.MethodGet, "/merge-request-review-log/search"},
 		{http.MethodPost, "/merge-request-review-log/delete"},
 		{http.MethodGet, "/merge-request-review-log/authors"},
 		{http.MethodGet, "/merge-request-review-log/project-names"},
@@ -134,6 +132,13 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 		{http.MethodPost, "/system/config/base-url"},
 		{http.MethodGet, "/review-log/get-share-token"},
 	})
+}
+
+func registerReviewLogRoutes(group *gin.RouterGroup, reviewLogHandler *handler.ReviewLogHandler) {
+	group.GET("/push-review-log/get", reviewLogHandler.GetPush)
+	group.GET("/push-review-log/search", reviewLogHandler.SearchPush)
+	group.GET("/merge-request-review-log/get", reviewLogHandler.GetMergeRequest)
+	group.GET("/merge-request-review-log/search", reviewLogHandler.SearchMergeRequest)
 }
 
 func registerProjectRoutes(group *gin.RouterGroup, projectHandler *handler.ProjectHandler) {

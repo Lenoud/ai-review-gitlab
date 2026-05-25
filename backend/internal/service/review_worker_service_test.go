@@ -11,7 +11,7 @@ import (
 
 func TestReviewWorkerProcessNextReturnsFalseWhenNoTask(t *testing.T) {
 	tasks := &fakeWorkerTaskRunner{claimErr: ErrReviewTaskNotFound}
-	worker := NewReviewWorkerService(tasks, &fakeWorkerProjectRepo{}, &fakeWorkerLLMModelRepo{}, &fakeWorkerGitLabClient{}, &fakeWorkerLLMClient{})
+	worker := NewReviewWorkerService(tasks, &fakeWorkerProjectRepo{}, &fakeWorkerLLMModelRepo{}, &fakeWorkerGitLabClient{}, &fakeWorkerLLMClient{}, nil)
 
 	result, err := worker.ProcessNext(context.Background(), "worker-1")
 
@@ -25,7 +25,7 @@ func TestReviewWorkerProcessNextHandlesPushTask(t *testing.T) {
 			ID:          10,
 			ProjectID:   7,
 			EventType:   ReviewTaskEventPush,
-			PayloadJSON: []byte(`{"project":{"id":123,"web_url":"https://gitlab.example.com/group/repo"},"after":"abc123"}`),
+			PayloadJSON: []byte(`{"project":{"id":123,"web_url":"https://gitlab.example.com/group/repo"},"user_username":"alice","user_name":"Alice","ref":"refs/heads/main","after":"abc123","commits":[{"id":"abc123","message":"fix auth\n","author":{"name":"Alice"},"url":"https://gitlab.example.com/group/repo/-/commit/abc123","timestamp":"2026-05-25T10:00:00Z"}]}`),
 		},
 	}
 	projects := &fakeWorkerProjectRepo{
@@ -51,7 +51,8 @@ func TestReviewWorkerProcessNextHandlesPushTask(t *testing.T) {
 		commitDiff: []GitLabDiff{{OldPath: "main.go", NewPath: "main.go", Diff: "@@ diff"}},
 	}
 	llm := &fakeWorkerLLMClient{response: "review ok"}
-	worker := NewReviewWorkerService(tasks, projects, models, gitlab, llm)
+	logs := &fakeWorkerReviewLogWriter{}
+	worker := NewReviewWorkerService(tasks, projects, models, gitlab, llm, logs)
 
 	result, err := worker.ProcessNext(context.Background(), "worker-1")
 
@@ -67,6 +68,15 @@ func TestReviewWorkerProcessNextHandlesPushTask(t *testing.T) {
 	require.Equal(t, "gpt-test", llm.lastInput.ModelCode)
 	require.True(t, tasks.started)
 	require.True(t, tasks.succeeded)
+	require.NotNil(t, logs.lastPush)
+	require.Equal(t, uint(7), logs.lastPush.ProjectID)
+	require.Equal(t, "repo", logs.lastPush.ProjectName)
+	require.Equal(t, "main", logs.lastPush.Branch)
+	require.Equal(t, "alice", logs.lastPush.AuthorIdentity)
+	require.Equal(t, "Alice", logs.lastPush.AuthorDisplayName)
+	require.Equal(t, "fix auth (by Alice);", logs.lastPush.CommitMessages)
+	require.Equal(t, "https://gitlab.example.com/group/repo/-/commit/abc123", logs.lastPush.LastCommitURL)
+	require.Equal(t, "review ok", logs.lastPush.ReviewResult)
 }
 
 func TestReviewWorkerProcessNextHandlesMergeRequestTask(t *testing.T) {
@@ -75,14 +85,15 @@ func TestReviewWorkerProcessNextHandlesMergeRequestTask(t *testing.T) {
 			ID:          11,
 			ProjectID:   8,
 			EventType:   ReviewTaskEventMergeRequest,
-			PayloadJSON: []byte(`{"project":{"id":456,"web_url":"https://gitlab.example.com/group/repo"},"object_attributes":{"iid":5,"last_commit":{"id":"def456"}}}`),
+			PayloadJSON: []byte(`{"project":{"id":456,"web_url":"https://gitlab.example.com/group/repo"},"user":{"username":"bob","name":"Bob"},"object_attributes":{"iid":5,"source_branch":"feature/login","target_branch":"main","url":"https://gitlab.example.com/group/repo/-/merge_requests/5","last_commit":{"id":"def456","message":"add login"}}}`),
 		},
 	}
-	projects := &fakeWorkerProjectRepo{project: &Project{ID: 8, WebURL: "https://gitlab.example.com/group/repo", AccessToken: "project-token"}}
+	projects := &fakeWorkerProjectRepo{project: &Project{ID: 8, Name: "repo", WebURL: "https://gitlab.example.com/group/repo", AccessToken: "project-token"}}
 	models := &fakeWorkerLLMModelRepo{model: &LLMModel{ModelCode: "gpt-test", APIBaseURL: "https://llm.example.com/v1", APIKey: "llm-key"}}
 	gitlab := &fakeWorkerGitLabClient{mrDiff: []GitLabDiff{{OldPath: "a.go", NewPath: "a.go", Diff: "@@ mr"}}}
 	llm := &fakeWorkerLLMClient{response: "mr review ok"}
-	worker := NewReviewWorkerService(tasks, projects, models, gitlab, llm)
+	logs := &fakeWorkerReviewLogWriter{}
+	worker := NewReviewWorkerService(tasks, projects, models, gitlab, llm, logs)
 
 	result, err := worker.ProcessNext(context.Background(), "worker-1")
 
@@ -92,6 +103,12 @@ func TestReviewWorkerProcessNextHandlesMergeRequestTask(t *testing.T) {
 	require.Equal(t, 5, gitlab.lastMRIID)
 	require.Contains(t, llm.lastPrompt, "@@ mr")
 	require.True(t, tasks.succeeded)
+	require.NotNil(t, logs.lastMerge)
+	require.Equal(t, uint(8), logs.lastMerge.ProjectID)
+	require.Equal(t, "feature/login", logs.lastMerge.SourceBranch)
+	require.Equal(t, "main", logs.lastMerge.TargetBranch)
+	require.Equal(t, "def456", logs.lastMerge.LastCommitID)
+	require.Equal(t, "mr review ok", logs.lastMerge.ReviewResult)
 }
 
 func TestReviewWorkerProcessNextMarksFailedWhenLLMFails(t *testing.T) {
@@ -110,6 +127,7 @@ func TestReviewWorkerProcessNextMarksFailedWhenLLMFails(t *testing.T) {
 		&fakeWorkerLLMModelRepo{model: &LLMModel{ModelCode: "gpt-test", APIBaseURL: "https://llm.example.com/v1", APIKey: "llm-key"}},
 		&fakeWorkerGitLabClient{commitDiff: []GitLabDiff{{NewPath: "main.go", Diff: "@@ diff"}}},
 		&fakeWorkerLLMClient{err: llmErr},
+		&fakeWorkerReviewLogWriter{},
 	)
 
 	result, err := worker.ProcessNext(context.Background(), "worker-1")
@@ -228,4 +246,21 @@ func (c *fakeWorkerLLMClient) Chat(ctx context.Context, input LLMChatInput) (str
 		return "", c.err
 	}
 	return c.response, nil
+}
+
+type fakeWorkerReviewLogWriter struct {
+	lastPush  *PushReviewLogInput
+	lastMerge *MergeRequestReviewLogInput
+}
+
+func (w *fakeWorkerReviewLogWriter) CreatePush(ctx context.Context, input PushReviewLogInput) (*PushReviewLog, error) {
+	copied := input
+	w.lastPush = &copied
+	return &PushReviewLog{ID: 101}, nil
+}
+
+func (w *fakeWorkerReviewLogWriter) CreateMergeRequest(ctx context.Context, input MergeRequestReviewLogInput) (*MergeRequestReviewLog, error) {
+	copied := input
+	w.lastMerge = &copied
+	return &MergeRequestReviewLog{ID: 202}, nil
 }

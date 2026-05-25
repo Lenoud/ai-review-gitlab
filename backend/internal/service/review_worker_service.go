@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 )
 
@@ -43,6 +44,11 @@ type LLMChatMessage struct {
 	Content string
 }
 
+type ReviewWorkerLogWriter interface {
+	CreatePush(ctx context.Context, input PushReviewLogInput) (*PushReviewLog, error)
+	CreateMergeRequest(ctx context.Context, input MergeRequestReviewLogInput) (*MergeRequestReviewLog, error)
+}
+
 type ReviewWorkerResult struct {
 	Processed  bool   `json:"processed"`
 	TaskID     uint   `json:"taskId,omitempty"`
@@ -55,6 +61,7 @@ type ReviewWorkerService struct {
 	models   ReviewWorkerLLMModelRepository
 	gitlab   GitLabClient
 	llm      LLMChatClient
+	logs     ReviewWorkerLogWriter
 }
 
 func NewReviewWorkerService(
@@ -63,6 +70,7 @@ func NewReviewWorkerService(
 	models ReviewWorkerLLMModelRepository,
 	gitlab GitLabClient,
 	llm LLMChatClient,
+	logs ReviewWorkerLogWriter,
 ) *ReviewWorkerService {
 	return &ReviewWorkerService{
 		tasks:    tasks,
@@ -70,6 +78,7 @@ func NewReviewWorkerService(
 		models:   models,
 		gitlab:   gitlab,
 		llm:      llm,
+		logs:     logs,
 	}
 }
 
@@ -110,11 +119,11 @@ func (s *ReviewWorkerService) processClaimedTask(ctx context.Context, task *Revi
 	if err != nil {
 		return "", err
 	}
-	diff, err := s.fetchTaskDiff(ctx, task, project)
+	payload, diff, err := s.fetchTaskDiff(ctx, task, project)
 	if err != nil {
 		return "", err
 	}
-	return s.llm.Chat(ctx, LLMChatInput{
+	reviewText, err := s.llm.Chat(ctx, LLMChatInput{
 		APIBaseURL: model.APIBaseURL,
 		APIKey:     model.APIKey,
 		ModelCode:  model.ModelCode,
@@ -124,32 +133,53 @@ func (s *ReviewWorkerService) processClaimedTask(ctx context.Context, task *Revi
 			{Role: "user", Content: buildReviewPrompt(project, task, diff)},
 		},
 	})
+	if err != nil {
+		return "", err
+	}
+	if s.logs != nil {
+		if err := s.createReviewLog(ctx, task, project, payload, diff, reviewText); err != nil {
+			return "", err
+		}
+	}
+	return reviewText, nil
 }
 
-func (s *ReviewWorkerService) fetchTaskDiff(ctx context.Context, task *ReviewTask, project *Project) ([]GitLabDiff, error) {
+func (s *ReviewWorkerService) fetchTaskDiff(ctx context.Context, task *ReviewTask, project *Project) (*reviewWorkerPayload, []GitLabDiff, error) {
 	payload, err := parseReviewWorkerPayload(task.EventType, task.PayloadJSON)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	baseURL, err := gitLabBaseURL(project.WebURL)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	client := s.gitlab.WithAuth(baseURL, project.AccessToken)
 	switch task.EventType {
 	case ReviewTaskEventPush:
-		return client.GetCommitDiff(ctx, payload.ProjectID, payload.AfterSHA)
+		diff, err := client.GetCommitDiff(ctx, payload.ProjectID, payload.AfterSHA)
+		return payload, diff, err
 	case ReviewTaskEventMergeRequest:
-		return client.GetMergeRequestChanges(ctx, payload.ProjectID, payload.MRIID)
+		diff, err := client.GetMergeRequestChanges(ctx, payload.ProjectID, payload.MRIID)
+		return payload, diff, err
 	default:
-		return nil, ErrInvalidReviewWorkerInput
+		return nil, nil, ErrInvalidReviewWorkerInput
 	}
 }
 
 type reviewWorkerPayload struct {
-	ProjectID int
-	AfterSHA  string
-	MRIID     int
+	ProjectID         int
+	AfterSHA          string
+	MRIID             int
+	AuthorIdentity    string
+	AuthorDisplayName string
+	Branch            string
+	CommitMessages    string
+	Commits           []ReviewCommit
+	LastCommitURL     string
+	SourceBranch      string
+	TargetBranch      string
+	LastCommitID      string
+	URL               string
 }
 
 func parseReviewWorkerPayload(eventType string, payload []byte) (*reviewWorkerPayload, error) {
@@ -157,9 +187,24 @@ func parseReviewWorkerPayload(eventType string, payload []byte) (*reviewWorkerPa
 	case ReviewTaskEventPush:
 		var body struct {
 			Project struct {
-				ID int `json:"id"`
+				ID     int    `json:"id"`
+				WebURL string `json:"web_url"`
 			} `json:"project"`
-			After string `json:"after"`
+			UserUsername string `json:"user_username"`
+			UserName     string `json:"user_name"`
+			UserEmail    string `json:"user_email"`
+			Ref          string `json:"ref"`
+			After        string `json:"after"`
+			Commits      []struct {
+				ID        string `json:"id"`
+				Message   string `json:"message"`
+				URL       string `json:"url"`
+				Timestamp string `json:"timestamp"`
+				Author    struct {
+					Name  string `json:"name"`
+					Email string `json:"email"`
+				} `json:"author"`
+			} `json:"commits"`
 		}
 		if err := json.Unmarshal(payload, &body); err != nil {
 			return nil, ErrInvalidReviewWorkerInput
@@ -168,14 +213,45 @@ func parseReviewWorkerPayload(eventType string, payload []byte) (*reviewWorkerPa
 		if body.Project.ID == 0 || after == "" {
 			return nil, ErrInvalidReviewWorkerInput
 		}
-		return &reviewWorkerPayload{ProjectID: body.Project.ID, AfterSHA: after}, nil
+		commits := make([]ReviewCommit, 0, len(body.Commits))
+		for _, commit := range body.Commits {
+			commits = append(commits, ReviewCommit{
+				Author:    firstNonBlank(commit.Author.Name, commit.Author.Email),
+				Message:   strings.TrimSpace(commit.Message),
+				URL:       strings.TrimSpace(commit.URL),
+				Timestamp: strings.TrimSpace(commit.Timestamp),
+			})
+		}
+		return &reviewWorkerPayload{
+			ProjectID:         body.Project.ID,
+			AfterSHA:          after,
+			AuthorIdentity:    firstNonBlank(body.UserUsername, body.UserEmail, body.UserName),
+			AuthorDisplayName: firstNonBlank(body.UserName, body.UserUsername),
+			Branch:            refToBranch(body.Ref),
+			CommitMessages:    buildCommitMessages(commits),
+			Commits:           commits,
+			LastCommitURL:     buildLastCommitURL(commits, body.Project.WebURL),
+		}, nil
 	case ReviewTaskEventMergeRequest:
 		var body struct {
 			Project struct {
 				ID int `json:"id"`
 			} `json:"project"`
+			User struct {
+				Username string `json:"username"`
+				Name     string `json:"name"`
+			} `json:"user"`
+			UserUsername     string `json:"user_username"`
+			UserName         string `json:"user_name"`
 			ObjectAttributes struct {
-				IID int `json:"iid"`
+				IID          int    `json:"iid"`
+				SourceBranch string `json:"source_branch"`
+				TargetBranch string `json:"target_branch"`
+				URL          string `json:"url"`
+				LastCommit   struct {
+					ID      string `json:"id"`
+					Message string `json:"message"`
+				} `json:"last_commit"`
 			} `json:"object_attributes"`
 		}
 		if err := json.Unmarshal(payload, &body); err != nil {
@@ -184,9 +260,63 @@ func parseReviewWorkerPayload(eventType string, payload []byte) (*reviewWorkerPa
 		if body.Project.ID == 0 || body.ObjectAttributes.IID == 0 {
 			return nil, ErrInvalidReviewWorkerInput
 		}
-		return &reviewWorkerPayload{ProjectID: body.Project.ID, MRIID: body.ObjectAttributes.IID}, nil
+		return &reviewWorkerPayload{
+			ProjectID:         body.Project.ID,
+			MRIID:             body.ObjectAttributes.IID,
+			AuthorIdentity:    firstNonBlank(body.User.Username, body.UserUsername, body.User.Name, body.UserName),
+			AuthorDisplayName: firstNonBlank(body.User.Name, body.UserName, body.User.Username, body.UserUsername),
+			SourceBranch:      strings.TrimSpace(body.ObjectAttributes.SourceBranch),
+			TargetBranch:      strings.TrimSpace(body.ObjectAttributes.TargetBranch),
+			CommitMessages:    strings.TrimSpace(body.ObjectAttributes.LastCommit.Message),
+			LastCommitID:      strings.TrimSpace(body.ObjectAttributes.LastCommit.ID),
+			URL:               strings.TrimSpace(body.ObjectAttributes.URL),
+		}, nil
 	default:
 		return nil, ErrInvalidReviewWorkerInput
+	}
+}
+
+func (s *ReviewWorkerService) createReviewLog(ctx context.Context, task *ReviewTask, project *Project, payload *reviewWorkerPayload, diff []GitLabDiff, reviewText string) error {
+	additions, deletions := countDiffStats(diff)
+	score := parseReviewScore(reviewText)
+	switch task.EventType {
+	case ReviewTaskEventPush:
+		_, err := s.logs.CreatePush(ctx, PushReviewLogInput{
+			ProjectID:         project.ID,
+			ProjectName:       project.Name,
+			Author:            payload.AuthorIdentity,
+			AuthorIdentity:    payload.AuthorIdentity,
+			AuthorDisplayName: payload.AuthorDisplayName,
+			Branch:            payload.Branch,
+			CommitMessages:    payload.CommitMessages,
+			Commits:           payload.Commits,
+			Score:             score,
+			Additions:         additions,
+			Deletions:         deletions,
+			LastCommitURL:     payload.LastCommitURL,
+			ReviewResult:      reviewText,
+		})
+		return err
+	case ReviewTaskEventMergeRequest:
+		_, err := s.logs.CreateMergeRequest(ctx, MergeRequestReviewLogInput{
+			ProjectID:         project.ID,
+			ProjectName:       project.Name,
+			Author:            payload.AuthorIdentity,
+			AuthorIdentity:    payload.AuthorIdentity,
+			AuthorDisplayName: payload.AuthorDisplayName,
+			SourceBranch:      payload.SourceBranch,
+			TargetBranch:      payload.TargetBranch,
+			CommitMessages:    payload.CommitMessages,
+			Score:             score,
+			Additions:         additions,
+			Deletions:         deletions,
+			LastCommitID:      payload.LastCommitID,
+			URL:               payload.URL,
+			ReviewResult:      reviewText,
+		})
+		return err
+	default:
+		return ErrInvalidReviewWorkerInput
 	}
 }
 
@@ -221,4 +351,75 @@ func buildReviewPrompt(project *Project, task *ReviewTask, diff []GitLabDiff) st
 		builder.WriteString("\n")
 	}
 	return builder.String()
+}
+
+func refToBranch(ref string) string {
+	ref = strings.TrimSpace(ref)
+	return strings.TrimPrefix(ref, "refs/heads/")
+}
+
+func buildCommitMessages(commits []ReviewCommit) string {
+	var builder strings.Builder
+	for _, commit := range commits {
+		message := strings.TrimRight(strings.TrimSpace(commit.Message), "\n")
+		author := strings.TrimSpace(commit.Author)
+		if message == "" && author == "" {
+			continue
+		}
+		builder.WriteString(fmt.Sprintf("%s (by %s);", message, author))
+	}
+	return builder.String()
+}
+
+func buildLastCommitURL(commits []ReviewCommit, fallback string) string {
+	for i := len(commits) - 1; i >= 0; i-- {
+		if strings.TrimSpace(commits[i].URL) != "" {
+			return strings.TrimSpace(commits[i].URL)
+		}
+	}
+	return strings.TrimSpace(fallback)
+}
+
+func firstNonBlank(values ...string) string {
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func countDiffStats(diff []GitLabDiff) (int, int) {
+	additions := 0
+	deletions := 0
+	for _, item := range diff {
+		for _, line := range strings.Split(item.Diff, "\n") {
+			if strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---") {
+				continue
+			}
+			if strings.HasPrefix(line, "+") {
+				additions++
+			}
+			if strings.HasPrefix(line, "-") {
+				deletions++
+			}
+		}
+	}
+	return additions, deletions
+}
+
+func parseReviewScore(reviewText string) int {
+	matches := regexp.MustCompile(`总分[:：]\s*(\d+)分?`).FindStringSubmatch(reviewText)
+	if len(matches) != 2 {
+		return 0
+	}
+	var score int
+	if _, err := fmt.Sscanf(matches[1], "%d", &score); err != nil {
+		return 0
+	}
+	if score < 0 || score > 100 {
+		return 0
+	}
+	return score
 }

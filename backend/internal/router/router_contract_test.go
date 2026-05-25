@@ -172,6 +172,12 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 			"/api/v1/admin/llm-model/set-default",
 			"/api/v1/admin/llm-test/connection":
 			expectedStatus = http.StatusBadRequest
+		case "/api/v1/admin/push-review-log/get",
+			"/api/v1/admin/merge-request-review-log/get":
+			expectedStatus = http.StatusBadRequest
+		case "/api/v1/admin/push-review-log/search",
+			"/api/v1/admin/merge-request-review-log/search":
+			expectedStatus = http.StatusOK
 		}
 		require.Equal(t, expectedStatus, w.Code, "%s %s with token", route.method, route.path)
 	}
@@ -183,6 +189,7 @@ func newContractRouter() *gin.Engine {
 		ProjectHandler:       handler.NewProjectHandler(&contractProjectService{}),
 		ProjectGitLabHandler: handler.NewProjectGitLabHandler(&contractProjectGitLabService{}),
 		LLMModelHandler:      handler.NewLLMModelHandler(&contractLLMModelService{}),
+		ReviewLogHandler:     handler.NewReviewLogHandler(&contractReviewLogService{}),
 		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
 			subject: &service.AuthSubject{
 				UserID:   1,
@@ -302,4 +309,32 @@ func (s *contractLLMModelService) SetDefault(ctx context.Context, id uint) error
 
 func (s *contractLLMModelService) TestConnection(ctx context.Context, input service.LLMConnectionInput) error {
 	return service.ErrInvalidLLMModelInput
+}
+
+type contractReviewLogService struct{}
+
+func (s *contractReviewLogService) GetPush(ctx context.Context, id uint) (*service.PushReviewLog, error) {
+	return nil, service.ErrInvalidReviewLogInput
+}
+
+func (s *contractReviewLogService) SearchPush(ctx context.Context, query service.ReviewLogSearchQuery) (*service.PushReviewLogPage, error) {
+	return &service.PushReviewLogPage{
+		Items: []service.PushReviewLog{},
+		Total: 0,
+		Page:  1,
+		Size:  20,
+	}, nil
+}
+
+func (s *contractReviewLogService) GetMergeRequest(ctx context.Context, id uint) (*service.MergeRequestReviewLog, error) {
+	return nil, service.ErrInvalidReviewLogInput
+}
+
+func (s *contractReviewLogService) SearchMergeRequest(ctx context.Context, query service.ReviewLogSearchQuery) (*service.MergeRequestReviewLogPage, error) {
+	return &service.MergeRequestReviewLogPage{
+		Items: []service.MergeRequestReviewLog{},
+		Total: 0,
+		Page:  1,
+		Size:  20,
+	}, nil
 }

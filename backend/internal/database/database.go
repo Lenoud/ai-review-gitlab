@@ -66,5 +66,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&model.LLMModel{},
 		&model.ReviewTask{},
 		&model.ReviewTaskAttempt{},
+		&model.PushReviewLog{},
+		&model.MergeRequestReviewLog{},
 	)
 }
