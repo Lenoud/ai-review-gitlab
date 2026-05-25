@@ -173,11 +173,22 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 			"/api/v1/admin/llm-test/connection":
 			expectedStatus = http.StatusBadRequest
 		case "/api/v1/admin/push-review-log/get",
-			"/api/v1/admin/merge-request-review-log/get":
+			"/api/v1/admin/merge-request-review-log/get",
+			"/api/v1/admin/review-log/get-share-token":
 			expectedStatus = http.StatusBadRequest
 		case "/api/v1/admin/push-review-log/search",
-			"/api/v1/admin/merge-request-review-log/search":
+			"/api/v1/admin/push-review-log/authors",
+			"/api/v1/admin/push-review-log/project-names",
+			"/api/v1/admin/merge-request-review-log/search",
+			"/api/v1/admin/merge-request-review-log/authors",
+			"/api/v1/admin/merge-request-review-log/project-names":
 			expectedStatus = http.StatusOK
+		case "/api/v1/admin/push-review-log/delete",
+			"/api/v1/admin/merge-request-review-log/delete":
+			expectedStatus = http.StatusBadRequest
+		case "/api/v1/admin/push-review-log/generate-share-token/1",
+			"/api/v1/admin/merge-request-review-log/generate-share-token/1":
+			expectedStatus = http.StatusNotFound
 		}
 		require.Equal(t, expectedStatus, w.Code, "%s %s with token", route.method, route.path)
 	}
@@ -326,6 +337,22 @@ func (s *contractReviewLogService) SearchPush(ctx context.Context, query service
 	}, nil
 }
 
+func (s *contractReviewLogService) DeletePush(ctx context.Context, id uint) error {
+	return service.ErrInvalidReviewLogInput
+}
+
+func (s *contractReviewLogService) PushAuthors(ctx context.Context, query service.ReviewLogOptionQuery) ([]service.AuthorOption, error) {
+	return []service.AuthorOption{}, nil
+}
+
+func (s *contractReviewLogService) PushProjectNames(ctx context.Context, query service.ReviewLogOptionQuery) ([]string, error) {
+	return []string{}, nil
+}
+
+func (s *contractReviewLogService) GeneratePushShareToken(ctx context.Context, id uint) (*service.ReviewLogShareToken, error) {
+	return nil, service.ErrReviewLogNotFound
+}
+
 func (s *contractReviewLogService) GetMergeRequest(ctx context.Context, id uint) (*service.MergeRequestReviewLog, error) {
 	return nil, service.ErrInvalidReviewLogInput
 }
@@ -337,4 +364,24 @@ func (s *contractReviewLogService) SearchMergeRequest(ctx context.Context, query
 		Page:  1,
 		Size:  20,
 	}, nil
+}
+
+func (s *contractReviewLogService) DeleteMergeRequest(ctx context.Context, id uint) error {
+	return service.ErrInvalidReviewLogInput
+}
+
+func (s *contractReviewLogService) MergeRequestAuthors(ctx context.Context, query service.ReviewLogOptionQuery) ([]service.AuthorOption, error) {
+	return []service.AuthorOption{}, nil
+}
+
+func (s *contractReviewLogService) MergeRequestProjectNames(ctx context.Context, query service.ReviewLogOptionQuery) ([]string, error) {
+	return []string{}, nil
+}
+
+func (s *contractReviewLogService) GenerateMergeRequestShareToken(ctx context.Context, id uint) (*service.ReviewLogShareToken, error) {
+	return nil, service.ErrReviewLogNotFound
+}
+
+func (s *contractReviewLogService) GetShareToken(ctx context.Context, eventType string, eventID uint) (*service.ReviewLogShareToken, error) {
+	return nil, service.ErrInvalidReviewLogInput
 }

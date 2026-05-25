@@ -63,15 +63,6 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 		{http.MethodPost, "/project/review-prompt/delete"},
 		{http.MethodPost, "/project/review-prompt/test"},
 
-		{http.MethodPost, "/push-review-log/delete"},
-		{http.MethodGet, "/push-review-log/authors"},
-		{http.MethodGet, "/push-review-log/project-names"},
-		{http.MethodPost, "/push-review-log/generate-share-token/:logId"},
-		{http.MethodPost, "/merge-request-review-log/delete"},
-		{http.MethodGet, "/merge-request-review-log/authors"},
-		{http.MethodGet, "/merge-request-review-log/project-names"},
-		{http.MethodPost, "/merge-request-review-log/generate-share-token/:logId"},
-
 		{http.MethodPost, "/ai-review-trace/create"},
 		{http.MethodGet, "/ai-review-trace/get"},
 
@@ -130,15 +121,23 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 		{http.MethodGet, "/system/info"},
 		{http.MethodGet, "/system/config"},
 		{http.MethodPost, "/system/config/base-url"},
-		{http.MethodGet, "/review-log/get-share-token"},
 	})
 }
 
 func registerReviewLogRoutes(group *gin.RouterGroup, reviewLogHandler *handler.ReviewLogHandler) {
 	group.GET("/push-review-log/get", reviewLogHandler.GetPush)
 	group.GET("/push-review-log/search", reviewLogHandler.SearchPush)
+	group.POST("/push-review-log/delete", reviewLogHandler.DeletePush)
+	group.GET("/push-review-log/authors", reviewLogHandler.PushAuthors)
+	group.GET("/push-review-log/project-names", reviewLogHandler.PushProjectNames)
+	group.POST("/push-review-log/generate-share-token/:logId", reviewLogHandler.GeneratePushShareToken)
 	group.GET("/merge-request-review-log/get", reviewLogHandler.GetMergeRequest)
 	group.GET("/merge-request-review-log/search", reviewLogHandler.SearchMergeRequest)
+	group.POST("/merge-request-review-log/delete", reviewLogHandler.DeleteMergeRequest)
+	group.GET("/merge-request-review-log/authors", reviewLogHandler.MergeRequestAuthors)
+	group.GET("/merge-request-review-log/project-names", reviewLogHandler.MergeRequestProjectNames)
+	group.POST("/merge-request-review-log/generate-share-token/:logId", reviewLogHandler.GenerateMergeRequestShareToken)
+	group.GET("/review-log/get-share-token", reviewLogHandler.GetShareToken)
 }
 
 func registerProjectRoutes(group *gin.RouterGroup, projectHandler *handler.ProjectHandler) {

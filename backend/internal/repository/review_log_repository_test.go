@@ -115,6 +115,66 @@ func TestReviewLogRepositoryMergeRequestCRUDAndSearch(t *testing.T) {
 	require.Equal(t, "def456", page.Items[0].LastCommitID)
 }
 
+func TestReviewLogRepositoryDeleteDistinctsAndShareToken(t *testing.T) {
+	db := openReviewLogRepositoryTestDB(t)
+	repo := NewReviewLogRepository(db)
+	ctx := context.Background()
+
+	pushAlice, err := repo.CreatePush(ctx, service.PushReviewLogInput{
+		ProjectID:         7,
+		ProjectName:       "ai-review",
+		Author:            "alice",
+		AuthorIdentity:    "alice",
+		AuthorDisplayName: "Alice",
+		Branch:            "main",
+	})
+	require.NoError(t, err)
+	_, err = repo.CreatePush(ctx, service.PushReviewLogInput{
+		ProjectID:         8,
+		ProjectName:       "other",
+		Author:            "alice",
+		AuthorIdentity:    "alice",
+		AuthorDisplayName: "Alice Zhang",
+		Branch:            "dev",
+	})
+	require.NoError(t, err)
+	mergeBob, err := repo.CreateMergeRequest(ctx, service.MergeRequestReviewLogInput{
+		ProjectID:         9,
+		ProjectName:       "ai-review",
+		Author:            "bob",
+		AuthorIdentity:    "bob",
+		AuthorDisplayName: "Bob",
+		SourceBranch:      "feature/login",
+	})
+	require.NoError(t, err)
+
+	authors, err := repo.DistinctPushAuthors(ctx, service.ReviewLogOptionQuery{})
+	require.NoError(t, err)
+	require.Equal(t, []service.AuthorOption{{Value: "alice", Label: "alice（Alice Zhang）", DisplayName: "Alice Zhang"}}, authors)
+
+	projectNames, err := repo.DistinctMergeRequestProjectNames(ctx, service.ReviewLogOptionQuery{Authors: []string{"bob"}})
+	require.NoError(t, err)
+	require.Equal(t, []string{"ai-review"}, projectNames)
+
+	expiresAt := time.Now().Add(7 * 24 * time.Hour).UnixMilli()
+	updated, err := repo.UpdatePushShareToken(ctx, pushAlice.ID, "token-push", expiresAt)
+	require.NoError(t, err)
+	require.Equal(t, "token-push", updated.ShareToken)
+	require.Equal(t, expiresAt, updated.ShareTokenExpiresAt)
+
+	updatedMR, err := repo.UpdateMergeRequestShareToken(ctx, mergeBob.ID, "token-mr", expiresAt)
+	require.NoError(t, err)
+	require.Equal(t, "token-mr", updatedMR.ShareToken)
+
+	require.NoError(t, repo.DeletePush(ctx, pushAlice.ID))
+	_, err = repo.FindPushByID(ctx, pushAlice.ID)
+	require.ErrorIs(t, err, service.ErrReviewLogNotFound)
+
+	require.NoError(t, repo.DeleteMergeRequest(ctx, mergeBob.ID))
+	_, err = repo.FindMergeRequestByID(ctx, mergeBob.ID)
+	require.ErrorIs(t, err, service.ErrReviewLogNotFound)
+}
+
 func openReviewLogRepositoryTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 

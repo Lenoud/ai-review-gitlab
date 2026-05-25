@@ -16,8 +16,17 @@ import (
 type ReviewLogService interface {
 	GetPush(ctx context.Context, id uint) (*service.PushReviewLog, error)
 	SearchPush(ctx context.Context, query service.ReviewLogSearchQuery) (*service.PushReviewLogPage, error)
+	DeletePush(ctx context.Context, id uint) error
+	PushAuthors(ctx context.Context, query service.ReviewLogOptionQuery) ([]service.AuthorOption, error)
+	PushProjectNames(ctx context.Context, query service.ReviewLogOptionQuery) ([]string, error)
+	GeneratePushShareToken(ctx context.Context, id uint) (*service.ReviewLogShareToken, error)
 	GetMergeRequest(ctx context.Context, id uint) (*service.MergeRequestReviewLog, error)
 	SearchMergeRequest(ctx context.Context, query service.ReviewLogSearchQuery) (*service.MergeRequestReviewLogPage, error)
+	DeleteMergeRequest(ctx context.Context, id uint) error
+	MergeRequestAuthors(ctx context.Context, query service.ReviewLogOptionQuery) ([]service.AuthorOption, error)
+	MergeRequestProjectNames(ctx context.Context, query service.ReviewLogOptionQuery) ([]string, error)
+	GenerateMergeRequestShareToken(ctx context.Context, id uint) (*service.ReviewLogShareToken, error)
+	GetShareToken(ctx context.Context, eventType string, eventID uint) (*service.ReviewLogShareToken, error)
 }
 
 type ReviewLogHandler struct {
@@ -51,6 +60,50 @@ func (h *ReviewLogHandler) SearchPush(c *gin.Context) {
 	response.Success(c, page)
 }
 
+func (h *ReviewLogHandler) DeletePush(c *gin.Context) {
+	id, ok := bindReviewLogID(c)
+	if !ok {
+		return
+	}
+	if err := h.logs.DeletePush(c.Request.Context(), id); err != nil {
+		writeReviewLogError(c, err)
+		return
+	}
+	response.Success(c, gin.H{"deleted": true})
+}
+
+func (h *ReviewLogHandler) PushAuthors(c *gin.Context) {
+	authors, err := h.logs.PushAuthors(c.Request.Context(), parseReviewLogOptionQuery(c))
+	if err != nil {
+		writeReviewLogError(c, err)
+		return
+	}
+	response.Success(c, authors)
+}
+
+func (h *ReviewLogHandler) PushProjectNames(c *gin.Context) {
+	names, err := h.logs.PushProjectNames(c.Request.Context(), parseReviewLogOptionQuery(c))
+	if err != nil {
+		writeReviewLogError(c, err)
+		return
+	}
+	response.Success(c, names)
+}
+
+func (h *ReviewLogHandler) GeneratePushShareToken(c *gin.Context) {
+	id, ok := parseUintParam(c, "logId")
+	if !ok {
+		response.BadRequest(c, "审查日志ID不能为空")
+		return
+	}
+	token, err := h.logs.GeneratePushShareToken(c.Request.Context(), id)
+	if err != nil {
+		writeReviewLogError(c, err)
+		return
+	}
+	response.Success(c, token)
+}
+
 func (h *ReviewLogHandler) GetMergeRequest(c *gin.Context) {
 	id, ok := parseUintQuery(c, "id")
 	if !ok {
@@ -74,6 +127,64 @@ func (h *ReviewLogHandler) SearchMergeRequest(c *gin.Context) {
 	response.Success(c, page)
 }
 
+func (h *ReviewLogHandler) DeleteMergeRequest(c *gin.Context) {
+	id, ok := bindReviewLogID(c)
+	if !ok {
+		return
+	}
+	if err := h.logs.DeleteMergeRequest(c.Request.Context(), id); err != nil {
+		writeReviewLogError(c, err)
+		return
+	}
+	response.Success(c, gin.H{"deleted": true})
+}
+
+func (h *ReviewLogHandler) MergeRequestAuthors(c *gin.Context) {
+	authors, err := h.logs.MergeRequestAuthors(c.Request.Context(), parseReviewLogOptionQuery(c))
+	if err != nil {
+		writeReviewLogError(c, err)
+		return
+	}
+	response.Success(c, authors)
+}
+
+func (h *ReviewLogHandler) MergeRequestProjectNames(c *gin.Context) {
+	names, err := h.logs.MergeRequestProjectNames(c.Request.Context(), parseReviewLogOptionQuery(c))
+	if err != nil {
+		writeReviewLogError(c, err)
+		return
+	}
+	response.Success(c, names)
+}
+
+func (h *ReviewLogHandler) GenerateMergeRequestShareToken(c *gin.Context) {
+	id, ok := parseUintParam(c, "logId")
+	if !ok {
+		response.BadRequest(c, "审查日志ID不能为空")
+		return
+	}
+	token, err := h.logs.GenerateMergeRequestShareToken(c.Request.Context(), id)
+	if err != nil {
+		writeReviewLogError(c, err)
+		return
+	}
+	response.Success(c, token)
+}
+
+func (h *ReviewLogHandler) GetShareToken(c *gin.Context) {
+	eventID, ok := parseUintQuery(c, "reviewEventId")
+	if !ok {
+		response.BadRequest(c, "审查日志ID不能为空")
+		return
+	}
+	token, err := h.logs.GetShareToken(c.Request.Context(), c.Query("reviewEventType"), eventID)
+	if err != nil {
+		writeReviewLogError(c, err)
+		return
+	}
+	response.Success(c, token)
+}
+
 func parseReviewLogSearchQuery(c *gin.Context) service.ReviewLogSearchQuery {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
@@ -91,6 +202,45 @@ func parseReviewLogSearchQuery(c *gin.Context) service.ReviewLogSearchQuery {
 		Size:           size,
 	}
 	return query
+}
+
+func parseReviewLogOptionQuery(c *gin.Context) service.ReviewLogOptionQuery {
+	return service.ReviewLogOptionQuery{
+		Authors:      parseListQuery(c, "authors"),
+		ProjectNames: parseListQuery(c, "projectNames"),
+		StartTime:    parseOptionalUnixMilliPtr(firstNonBlankQuery(c, "startTimestamp", "startTime")),
+		EndTime:      parseOptionalUnixMilliPtr(firstNonBlankQuery(c, "endTimestamp", "endTime")),
+	}
+}
+
+func bindReviewLogID(c *gin.Context) (uint, bool) {
+	var req struct {
+		ID uint `json:"id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.ID == 0 {
+		response.BadRequest(c, "审查日志ID不能为空")
+		return 0, false
+	}
+	return req.ID, true
+}
+
+func parseUintParam(c *gin.Context, key string) (uint, bool) {
+	value := strings.TrimSpace(c.Param(key))
+	parsed, err := strconv.ParseUint(value, 10, 64)
+	if err != nil || parsed == 0 {
+		return 0, false
+	}
+	return uint(parsed), true
+}
+
+func firstNonBlankQuery(c *gin.Context, keys ...string) string {
+	for _, key := range keys {
+		value := strings.TrimSpace(c.Query(key))
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func parseOptionalUint(value string) uint {

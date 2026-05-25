@@ -71,6 +71,49 @@ func (r *ReviewLogRepository) SearchPush(ctx context.Context, query service.Revi
 	return &service.PushReviewLogPage{Items: items, Total: total, Page: query.Page, Size: query.Size}, nil
 }
 
+func (r *ReviewLogRepository) DeletePush(ctx context.Context, id uint) error {
+	result := r.db.WithContext(ctx).Delete(&model.PushReviewLog{}, id)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return service.ErrReviewLogNotFound
+	}
+	return nil
+}
+
+func (r *ReviewLogRepository) DistinctPushAuthors(ctx context.Context, query service.ReviewLogOptionQuery) ([]service.AuthorOption, error) {
+	var rows []authorRow
+	db := applyOptionFilters(r.db.WithContext(ctx).Model(&model.PushReviewLog{}), query)
+	if err := db.Select("author_identity, author_display_name").Where("author_identity <> ''").Order("author_identity ASC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	return mergeAuthorOptions(rows), nil
+}
+
+func (r *ReviewLogRepository) DistinctPushProjectNames(ctx context.Context, query service.ReviewLogOptionQuery) ([]string, error) {
+	var names []string
+	db := applyOptionFilters(r.db.WithContext(ctx).Model(&model.PushReviewLog{}), query)
+	if err := db.Distinct("project_name").Where("project_name <> ''").Order("project_name ASC").Pluck("project_name", &names).Error; err != nil {
+		return nil, err
+	}
+	return names, nil
+}
+
+func (r *ReviewLogRepository) UpdatePushShareToken(ctx context.Context, id uint, token string, expiresAt int64) (*service.PushReviewLog, error) {
+	result := r.db.WithContext(ctx).Model(&model.PushReviewLog{}).Where("id = ?", id).Updates(map[string]any{
+		"share_token":            token,
+		"share_token_expires_at": expiresAt,
+	})
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, service.ErrReviewLogNotFound
+	}
+	return r.FindPushByID(ctx, id)
+}
+
 func (r *ReviewLogRepository) CreateMergeRequest(ctx context.Context, input service.MergeRequestReviewLogInput) (*service.MergeRequestReviewLog, error) {
 	record := mergeRequestReviewLogModelFromInput(input)
 	if err := r.db.WithContext(ctx).Create(record).Error; err != nil {
@@ -116,6 +159,49 @@ func (r *ReviewLogRepository) SearchMergeRequest(ctx context.Context, query serv
 	return &service.MergeRequestReviewLogPage{Items: items, Total: total, Page: query.Page, Size: query.Size}, nil
 }
 
+func (r *ReviewLogRepository) DeleteMergeRequest(ctx context.Context, id uint) error {
+	result := r.db.WithContext(ctx).Delete(&model.MergeRequestReviewLog{}, id)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return service.ErrReviewLogNotFound
+	}
+	return nil
+}
+
+func (r *ReviewLogRepository) DistinctMergeRequestAuthors(ctx context.Context, query service.ReviewLogOptionQuery) ([]service.AuthorOption, error) {
+	var rows []authorRow
+	db := applyOptionFilters(r.db.WithContext(ctx).Model(&model.MergeRequestReviewLog{}), query)
+	if err := db.Select("author_identity, author_display_name").Where("author_identity <> ''").Order("author_identity ASC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	return mergeAuthorOptions(rows), nil
+}
+
+func (r *ReviewLogRepository) DistinctMergeRequestProjectNames(ctx context.Context, query service.ReviewLogOptionQuery) ([]string, error) {
+	var names []string
+	db := applyOptionFilters(r.db.WithContext(ctx).Model(&model.MergeRequestReviewLog{}), query)
+	if err := db.Distinct("project_name").Where("project_name <> ''").Order("project_name ASC").Pluck("project_name", &names).Error; err != nil {
+		return nil, err
+	}
+	return names, nil
+}
+
+func (r *ReviewLogRepository) UpdateMergeRequestShareToken(ctx context.Context, id uint, token string, expiresAt int64) (*service.MergeRequestReviewLog, error) {
+	result := r.db.WithContext(ctx).Model(&model.MergeRequestReviewLog{}).Where("id = ?", id).Updates(map[string]any{
+		"share_token":            token,
+		"share_token_expires_at": expiresAt,
+	})
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, service.ErrReviewLogNotFound
+	}
+	return r.FindMergeRequestByID(ctx, id)
+}
+
 func applyCommonReviewLogFilters(db *gorm.DB, query service.ReviewLogSearchQuery) *gorm.DB {
 	if query.ProjectID > 0 {
 		db = db.Where("project_id = ?", query.ProjectID)
@@ -142,6 +228,64 @@ func applyCommonReviewLogFilters(db *gorm.DB, query service.ReviewLogSearchQuery
 		db = db.Where("created_at <= ?", *query.EndTime)
 	}
 	return db
+}
+
+func applyOptionFilters(db *gorm.DB, query service.ReviewLogOptionQuery) *gorm.DB {
+	if len(query.Authors) > 0 {
+		db = db.Where("author_identity IN ?", query.Authors)
+	}
+	if len(query.ProjectNames) > 0 {
+		db = db.Where("project_name IN ?", query.ProjectNames)
+	}
+	if query.StartTime != nil {
+		db = db.Where("created_at >= ?", *query.StartTime)
+	}
+	if query.EndTime != nil {
+		db = db.Where("created_at <= ?", *query.EndTime)
+	}
+	return db
+}
+
+type authorRow struct {
+	AuthorIdentity    string `gorm:"column:author_identity"`
+	AuthorDisplayName string `gorm:"column:author_display_name"`
+}
+
+func mergeAuthorOptions(rows []authorRow) []service.AuthorOption {
+	displayByIdentity := map[string]string{}
+	order := make([]string, 0, len(rows))
+	for _, row := range rows {
+		identity := strings.TrimSpace(row.AuthorIdentity)
+		if identity == "" {
+			continue
+		}
+		if _, ok := displayByIdentity[identity]; !ok {
+			order = append(order, identity)
+		}
+		displayByIdentity[identity] = preferDisplayName(displayByIdentity[identity], row.AuthorDisplayName)
+	}
+	options := make([]service.AuthorOption, 0, len(order))
+	for _, identity := range order {
+		displayName := displayByIdentity[identity]
+		options = append(options, service.AuthorOption{
+			Value:       identity,
+			Label:       authorDisplayText(identity, displayName),
+			DisplayName: displayName,
+		})
+	}
+	return options
+}
+
+func preferDisplayName(current string, candidate string) string {
+	current = strings.TrimSpace(current)
+	candidate = strings.TrimSpace(candidate)
+	if candidate == "" {
+		return current
+	}
+	if current == "" || len(candidate) > len(current) {
+		return candidate
+	}
+	return current
 }
 
 func pushReviewLogModelFromInput(input service.PushReviewLogInput) (*model.PushReviewLog, error) {
