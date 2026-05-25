@@ -12,6 +12,7 @@ type Config struct {
 	Database DatabaseConfig `mapstructure:"database"`
 	Auth     AuthConfig     `mapstructure:"auth"`
 	Log      LogConfig      `mapstructure:"log"`
+	Worker   WorkerConfig   `mapstructure:"worker"`
 }
 
 type ServerConfig struct {
@@ -50,6 +51,13 @@ type LogConfig struct {
 	Format string `mapstructure:"format"`
 }
 
+type WorkerConfig struct {
+	Enabled       bool   `mapstructure:"enabled"`
+	ID            string `mapstructure:"id"`
+	IdleInterval  string `mapstructure:"idle_interval"`
+	ErrorInterval string `mapstructure:"error_interval"`
+}
+
 func Load() (*Config, error) {
 	v := viper.New()
 	v.SetConfigName("config")
@@ -78,6 +86,10 @@ func Load() (*Config, error) {
 	v.SetDefault("auth.admin_password", "admin123")
 	v.SetDefault("log.level", "info")
 	v.SetDefault("log.format", "json")
+	v.SetDefault("worker.enabled", false)
+	v.SetDefault("worker.id", "review-worker-1")
+	v.SetDefault("worker.idle_interval", "5s")
+	v.SetDefault("worker.error_interval", "30s")
 
 	_ = v.ReadInConfig()
 

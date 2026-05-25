@@ -26,3 +26,8 @@ log:
   level: info
   format: json
 
+worker:
+  enabled: false
+  id: review-worker-1
+  idle_interval: 5s
+  error_interval: 30s

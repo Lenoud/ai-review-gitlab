@@ -20,6 +20,10 @@ func TestLoadDefaults(t *testing.T) {
 	require.Equal(t, "admin123", cfg.Auth.AdminPassword)
 	require.Equal(t, "30m", cfg.Auth.AccessTokenTTL)
 	require.Equal(t, "720h", cfg.Auth.RefreshTokenTTL)
+	require.False(t, cfg.Worker.Enabled)
+	require.Equal(t, "review-worker-1", cfg.Worker.ID)
+	require.Equal(t, "5s", cfg.Worker.IdleInterval)
+	require.Equal(t, "30s", cfg.Worker.ErrorInterval)
 }
 
 func TestLoadEnvOverridesForDatabaseAndAdmin(t *testing.T) {
@@ -41,4 +45,19 @@ func TestLoadEnvOverridesForDatabaseAndAdmin(t *testing.T) {
 	require.Equal(t, "review_db", cfg.Database.DBName)
 	require.Equal(t, "root", cfg.Auth.AdminUsername)
 	require.Equal(t, "root-password", cfg.Auth.AdminPassword)
+}
+
+func TestLoadEnvOverridesForWorker(t *testing.T) {
+	t.Setenv("WORKER_ENABLED", "true")
+	t.Setenv("WORKER_ID", "worker-test")
+	t.Setenv("WORKER_IDLE_INTERVAL", "1s")
+	t.Setenv("WORKER_ERROR_INTERVAL", "2s")
+
+	cfg, err := Load()
+
+	require.NoError(t, err)
+	require.True(t, cfg.Worker.Enabled)
+	require.Equal(t, "worker-test", cfg.Worker.ID)
+	require.Equal(t, "1s", cfg.Worker.IdleInterval)
+	require.Equal(t, "2s", cfg.Worker.ErrorInterval)
 }

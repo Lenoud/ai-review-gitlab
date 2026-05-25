@@ -14,6 +14,7 @@ import (
 	"github.com/Lenoud/ai-review-gitlab/backend/internal/repository"
 	"github.com/Lenoud/ai-review-gitlab/backend/internal/router"
 	"github.com/Lenoud/ai-review-gitlab/backend/internal/service"
+	"github.com/Lenoud/ai-review-gitlab/backend/internal/worker"
 )
 
 func main() {
@@ -59,6 +60,38 @@ func main() {
 	gitLabSvc := service.NewGitLabService(platformgitlab.NewServiceAdapter(nil))
 	reviewTaskSvc := service.NewReviewTaskService(repository.NewProjectRepository(db), repository.NewReviewTaskRepository(db), service.ReviewTaskOptions{})
 	llmModelSvc := service.NewLLMModelService(repository.NewLLMModelRepository(db), llm.NewOpenAICompatibleChecker(nil))
+	workerCtx, stopWorker := context.WithCancel(context.Background())
+	var workerRunner *worker.Runner
+	if cfg.Worker.Enabled {
+		idleInterval, err := time.ParseDuration(cfg.Worker.IdleInterval)
+		if err != nil {
+			log.Fatalf("parse worker.idle_interval: %v", err)
+		}
+		errorInterval, err := time.ParseDuration(cfg.Worker.ErrorInterval)
+		if err != nil {
+			log.Fatalf("parse worker.error_interval: %v", err)
+		}
+		reviewWorkerSvc := service.NewReviewWorkerService(
+			reviewTaskSvc,
+			repository.NewProjectRepository(db),
+			repository.NewLLMModelRepository(db),
+			platformgitlab.NewServiceAdapter(nil),
+			llm.NewOpenAICompatibleClient(nil),
+		)
+		workerRunner = worker.NewRunner(reviewWorkerSvc, worker.RunnerOptions{
+			WorkerID:      cfg.Worker.ID,
+			IdleInterval:  idleInterval,
+			ErrorInterval: errorInterval,
+		})
+		workerRunner.Start(workerCtx)
+		log.Printf("review worker started: id=%s", cfg.Worker.ID)
+	}
+	defer func() {
+		stopWorker()
+		if workerRunner != nil {
+			workerRunner.Wait()
+		}
+	}()
 	authHandler := handler.NewAuthHandler(authSvc)
 	projectHandler := handler.NewProjectHandler(projectSvc)
 	projectGitLabHandler := handler.NewProjectGitLabHandler(gitLabSvc)
