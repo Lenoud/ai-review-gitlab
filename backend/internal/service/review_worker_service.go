@@ -49,6 +49,10 @@ type ReviewWorkerLogWriter interface {
 	CreateMergeRequest(ctx context.Context, input MergeRequestReviewLogInput) (*MergeRequestReviewLog, error)
 }
 
+type ReviewWorkerTraceWriter interface {
+	Create(ctx context.Context, input AIReviewTraceInput) (*AIReviewTrace, error)
+}
+
 type ReviewWorkerResult struct {
 	Processed  bool   `json:"processed"`
 	TaskID     uint   `json:"taskId,omitempty"`
@@ -62,6 +66,7 @@ type ReviewWorkerService struct {
 	gitlab   GitLabClient
 	llm      LLMChatClient
 	logs     ReviewWorkerLogWriter
+	traces   ReviewWorkerTraceWriter
 }
 
 func NewReviewWorkerService(
@@ -71,6 +76,7 @@ func NewReviewWorkerService(
 	gitlab GitLabClient,
 	llm LLMChatClient,
 	logs ReviewWorkerLogWriter,
+	traces ReviewWorkerTraceWriter,
 ) *ReviewWorkerService {
 	return &ReviewWorkerService{
 		tasks:    tasks,
@@ -79,6 +85,7 @@ func NewReviewWorkerService(
 		gitlab:   gitlab,
 		llm:      llm,
 		logs:     logs,
+		traces:   traces,
 	}
 }
 
@@ -123,22 +130,29 @@ func (s *ReviewWorkerService) processClaimedTask(ctx context.Context, task *Revi
 	if err != nil {
 		return "", err
 	}
+	messages := []LLMChatMessage{
+		{Role: "system", Content: "你是一个严谨的代码审查助手。请基于 diff 给出问题、风险和建议。"},
+		{Role: "user", Content: buildReviewPrompt(project, task, diff)},
+	}
 	reviewText, err := s.llm.Chat(ctx, LLMChatInput{
 		APIBaseURL: model.APIBaseURL,
 		APIKey:     model.APIKey,
 		ModelCode:  model.ModelCode,
 		MaxTokens:  model.MaxTokens,
-		Messages: []LLMChatMessage{
-			{Role: "system", Content: "你是一个严谨的代码审查助手。请基于 diff 给出问题、风险和建议。"},
-			{Role: "user", Content: buildReviewPrompt(project, task, diff)},
-		},
+		Messages:   messages,
 	})
 	if err != nil {
 		return "", err
 	}
 	if s.logs != nil {
-		if err := s.createReviewLog(ctx, task, project, payload, diff, reviewText); err != nil {
+		eventType, eventID, err := s.createReviewLog(ctx, task, project, payload, diff, reviewText)
+		if err != nil {
 			return "", err
+		}
+		if s.traces != nil {
+			if err := s.createAIReviewTrace(ctx, eventType, eventID, messages, reviewText, model); err != nil {
+				return "", err
+			}
 		}
 	}
 	return reviewText, nil
@@ -276,12 +290,12 @@ func parseReviewWorkerPayload(eventType string, payload []byte) (*reviewWorkerPa
 	}
 }
 
-func (s *ReviewWorkerService) createReviewLog(ctx context.Context, task *ReviewTask, project *Project, payload *reviewWorkerPayload, diff []GitLabDiff, reviewText string) error {
+func (s *ReviewWorkerService) createReviewLog(ctx context.Context, task *ReviewTask, project *Project, payload *reviewWorkerPayload, diff []GitLabDiff, reviewText string) (string, uint, error) {
 	additions, deletions := countDiffStats(diff)
 	score := parseReviewScore(reviewText)
 	switch task.EventType {
 	case ReviewTaskEventPush:
-		_, err := s.logs.CreatePush(ctx, PushReviewLogInput{
+		log, err := s.logs.CreatePush(ctx, PushReviewLogInput{
 			ProjectID:         project.ID,
 			ProjectName:       project.Name,
 			Author:            payload.AuthorIdentity,
@@ -296,9 +310,12 @@ func (s *ReviewWorkerService) createReviewLog(ctx context.Context, task *ReviewT
 			LastCommitURL:     payload.LastCommitURL,
 			ReviewResult:      reviewText,
 		})
-		return err
+		if err != nil {
+			return "", 0, err
+		}
+		return ReviewTaskEventPush, log.ID, nil
 	case ReviewTaskEventMergeRequest:
-		_, err := s.logs.CreateMergeRequest(ctx, MergeRequestReviewLogInput{
+		log, err := s.logs.CreateMergeRequest(ctx, MergeRequestReviewLogInput{
 			ProjectID:         project.ID,
 			ProjectName:       project.Name,
 			Author:            payload.AuthorIdentity,
@@ -314,10 +331,28 @@ func (s *ReviewWorkerService) createReviewLog(ctx context.Context, task *ReviewT
 			URL:               payload.URL,
 			ReviewResult:      reviewText,
 		})
-		return err
+		if err != nil {
+			return "", 0, err
+		}
+		return ReviewTaskEventMergeRequest, log.ID, nil
 	default:
+		return "", 0, ErrInvalidReviewWorkerInput
+	}
+}
+
+func (s *ReviewWorkerService) createAIReviewTrace(ctx context.Context, eventType string, eventID uint, messages []LLMChatMessage, reviewText string, model *LLMModel) error {
+	if eventID == 0 {
 		return ErrInvalidReviewWorkerInput
 	}
+	_, err := s.traces.Create(ctx, AIReviewTraceInput{
+		ReviewEventType: eventType,
+		ReviewEventID:   eventID,
+		Prompt:          renderLLMPrompt(messages),
+		Response:        reviewText,
+		Provider:        model.Provider,
+		ModelCode:       model.ModelCode,
+	})
+	return err
 }
 
 func gitLabBaseURL(webURL string) (string, error) {
@@ -349,6 +384,19 @@ func buildReviewPrompt(project *Project, task *ReviewTask, diff []GitLabDiff) st
 		builder.WriteString(fmt.Sprintf("\n--- %s ---\n", path))
 		builder.WriteString(item.Diff)
 		builder.WriteString("\n")
+	}
+	return builder.String()
+}
+
+func renderLLMPrompt(messages []LLMChatMessage) string {
+	var builder strings.Builder
+	for i, message := range messages {
+		if i > 0 {
+			builder.WriteString("\n\n")
+		}
+		builder.WriteString(strings.TrimSpace(message.Role))
+		builder.WriteString(":\n")
+		builder.WriteString(message.Content)
 	}
 	return builder.String()
 }

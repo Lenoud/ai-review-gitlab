@@ -19,6 +19,7 @@ type Dependencies struct {
 	ProjectGitLabHandler *handler.ProjectGitLabHandler
 	LLMModelHandler      *handler.LLMModelHandler
 	ReviewLogHandler     *handler.ReviewLogHandler
+	AIReviewTraceHandler *handler.AIReviewTraceHandler
 	OpenReportHandler    *handler.OpenReportHandler
 	WebhookHandler       *handler.WebhookHandler
 	AuthMiddleware       gin.HandlerFunc
@@ -57,15 +58,13 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 	registerProjectGitLabRoutes(admin, deps.ProjectGitLabHandler)
 	registerLLMModelRoutes(admin, deps.LLMModelHandler)
 	registerReviewLogRoutes(admin, deps.ReviewLogHandler)
+	registerAIReviewTraceRoutes(admin, deps.AIReviewTraceHandler)
 	registerRoutes(admin, []routeDef{
 		{http.MethodGet, "/project/review-prompt/get"},
 		{http.MethodGet, "/project/review-prompt/default"},
 		{http.MethodPost, "/project/review-prompt/update"},
 		{http.MethodPost, "/project/review-prompt/delete"},
 		{http.MethodPost, "/project/review-prompt/test"},
-
-		{http.MethodPost, "/ai-review-trace/create"},
-		{http.MethodGet, "/ai-review-trace/get"},
 
 		{http.MethodPost, "/im-robot/create"},
 		{http.MethodPost, "/im-robot/update"},
@@ -139,6 +138,11 @@ func registerReviewLogRoutes(group *gin.RouterGroup, reviewLogHandler *handler.R
 	group.GET("/merge-request-review-log/project-names", reviewLogHandler.MergeRequestProjectNames)
 	group.POST("/merge-request-review-log/generate-share-token/:logId", reviewLogHandler.GenerateMergeRequestShareToken)
 	group.GET("/review-log/get-share-token", reviewLogHandler.GetShareToken)
+}
+
+func registerAIReviewTraceRoutes(group *gin.RouterGroup, traceHandler *handler.AIReviewTraceHandler) {
+	group.POST("/ai-review-trace/create", traceHandler.Create)
+	group.GET("/ai-review-trace/get", traceHandler.Get)
 }
 
 func registerProjectRoutes(group *gin.RouterGroup, projectHandler *handler.ProjectHandler) {

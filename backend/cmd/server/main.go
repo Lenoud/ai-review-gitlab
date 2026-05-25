@@ -60,6 +60,7 @@ func main() {
 	gitLabSvc := service.NewGitLabService(platformgitlab.NewServiceAdapter(nil))
 	reviewTaskSvc := service.NewReviewTaskService(repository.NewProjectRepository(db), repository.NewReviewTaskRepository(db), service.ReviewTaskOptions{})
 	reviewLogSvc := service.NewReviewLogService(repository.NewReviewLogRepository(db))
+	aiReviewTraceSvc := service.NewAIReviewTraceService(repository.NewAIReviewTraceRepository(db))
 	openReportSvc := service.NewOpenReportService(repository.NewReviewLogRepository(db))
 	llmModelSvc := service.NewLLMModelService(repository.NewLLMModelRepository(db), llm.NewOpenAICompatibleChecker(nil))
 	workerCtx, stopWorker := context.WithCancel(context.Background())
@@ -80,6 +81,7 @@ func main() {
 			platformgitlab.NewServiceAdapter(nil),
 			llm.NewOpenAICompatibleClient(nil),
 			repository.NewReviewLogRepository(db),
+			repository.NewAIReviewTraceRepository(db),
 		)
 		workerRunner = worker.NewRunner(reviewWorkerSvc, worker.RunnerOptions{
 			WorkerID:      cfg.Worker.ID,
@@ -100,6 +102,7 @@ func main() {
 	projectGitLabHandler := handler.NewProjectGitLabHandler(gitLabSvc)
 	llmModelHandler := handler.NewLLMModelHandler(llmModelSvc)
 	reviewLogHandler := handler.NewReviewLogHandler(reviewLogSvc)
+	aiReviewTraceHandler := handler.NewAIReviewTraceHandler(aiReviewTraceSvc)
 	openReportHandler := handler.NewOpenReportHandler(openReportSvc)
 	webhookHandler := handler.NewWebhookHandler(reviewTaskSvc)
 	r := router.New(router.Dependencies{
@@ -108,6 +111,7 @@ func main() {
 		ProjectGitLabHandler: projectGitLabHandler,
 		LLMModelHandler:      llmModelHandler,
 		ReviewLogHandler:     reviewLogHandler,
+		AIReviewTraceHandler: aiReviewTraceHandler,
 		OpenReportHandler:    openReportHandler,
 		WebhookHandler:       webhookHandler,
 		AuthMiddleware:       middleware.JWTAuth(authSvc),

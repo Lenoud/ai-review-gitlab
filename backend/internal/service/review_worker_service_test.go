@@ -11,7 +11,7 @@ import (
 
 func TestReviewWorkerProcessNextReturnsFalseWhenNoTask(t *testing.T) {
 	tasks := &fakeWorkerTaskRunner{claimErr: ErrReviewTaskNotFound}
-	worker := NewReviewWorkerService(tasks, &fakeWorkerProjectRepo{}, &fakeWorkerLLMModelRepo{}, &fakeWorkerGitLabClient{}, &fakeWorkerLLMClient{}, nil)
+	worker := NewReviewWorkerService(tasks, &fakeWorkerProjectRepo{}, &fakeWorkerLLMModelRepo{}, &fakeWorkerGitLabClient{}, &fakeWorkerLLMClient{}, nil, nil)
 
 	result, err := worker.ProcessNext(context.Background(), "worker-1")
 
@@ -52,7 +52,8 @@ func TestReviewWorkerProcessNextHandlesPushTask(t *testing.T) {
 	}
 	llm := &fakeWorkerLLMClient{response: "review ok"}
 	logs := &fakeWorkerReviewLogWriter{}
-	worker := NewReviewWorkerService(tasks, projects, models, gitlab, llm, logs)
+	traces := &fakeWorkerTraceWriter{}
+	worker := NewReviewWorkerService(tasks, projects, models, gitlab, llm, logs, traces)
 
 	result, err := worker.ProcessNext(context.Background(), "worker-1")
 
@@ -77,6 +78,13 @@ func TestReviewWorkerProcessNextHandlesPushTask(t *testing.T) {
 	require.Equal(t, "fix auth (by Alice);", logs.lastPush.CommitMessages)
 	require.Equal(t, "https://gitlab.example.com/group/repo/-/commit/abc123", logs.lastPush.LastCommitURL)
 	require.Equal(t, "review ok", logs.lastPush.ReviewResult)
+	require.NotNil(t, traces.last)
+	require.Equal(t, "push", traces.last.ReviewEventType)
+	require.Equal(t, uint(101), traces.last.ReviewEventID)
+	require.Contains(t, traces.last.Prompt, "@@ diff")
+	require.Equal(t, "review ok", traces.last.Response)
+	require.Equal(t, "openai", traces.last.Provider)
+	require.Equal(t, "gpt-test", traces.last.ModelCode)
 }
 
 func TestReviewWorkerProcessNextHandlesMergeRequestTask(t *testing.T) {
@@ -93,7 +101,8 @@ func TestReviewWorkerProcessNextHandlesMergeRequestTask(t *testing.T) {
 	gitlab := &fakeWorkerGitLabClient{mrDiff: []GitLabDiff{{OldPath: "a.go", NewPath: "a.go", Diff: "@@ mr"}}}
 	llm := &fakeWorkerLLMClient{response: "mr review ok"}
 	logs := &fakeWorkerReviewLogWriter{}
-	worker := NewReviewWorkerService(tasks, projects, models, gitlab, llm, logs)
+	traces := &fakeWorkerTraceWriter{}
+	worker := NewReviewWorkerService(tasks, projects, models, gitlab, llm, logs, traces)
 
 	result, err := worker.ProcessNext(context.Background(), "worker-1")
 
@@ -109,6 +118,12 @@ func TestReviewWorkerProcessNextHandlesMergeRequestTask(t *testing.T) {
 	require.Equal(t, "main", logs.lastMerge.TargetBranch)
 	require.Equal(t, "def456", logs.lastMerge.LastCommitID)
 	require.Equal(t, "mr review ok", logs.lastMerge.ReviewResult)
+	require.NotNil(t, traces.last)
+	require.Equal(t, "merge_request", traces.last.ReviewEventType)
+	require.Equal(t, uint(202), traces.last.ReviewEventID)
+	require.Contains(t, traces.last.Prompt, "@@ mr")
+	require.Equal(t, "mr review ok", traces.last.Response)
+	require.Equal(t, "gpt-test", traces.last.ModelCode)
 }
 
 func TestReviewWorkerProcessNextMarksFailedWhenLLMFails(t *testing.T) {
@@ -128,6 +143,7 @@ func TestReviewWorkerProcessNextMarksFailedWhenLLMFails(t *testing.T) {
 		&fakeWorkerGitLabClient{commitDiff: []GitLabDiff{{NewPath: "main.go", Diff: "@@ diff"}}},
 		&fakeWorkerLLMClient{err: llmErr},
 		&fakeWorkerReviewLogWriter{},
+		nil,
 	)
 
 	result, err := worker.ProcessNext(context.Background(), "worker-1")
@@ -263,4 +279,14 @@ func (w *fakeWorkerReviewLogWriter) CreateMergeRequest(ctx context.Context, inpu
 	copied := input
 	w.lastMerge = &copied
 	return &MergeRequestReviewLog{ID: 202}, nil
+}
+
+type fakeWorkerTraceWriter struct {
+	last *AIReviewTraceInput
+}
+
+func (w *fakeWorkerTraceWriter) Create(ctx context.Context, input AIReviewTraceInput) (*AIReviewTrace, error) {
+	copied := input
+	w.last = &copied
+	return &AIReviewTrace{ID: 303}, nil
 }

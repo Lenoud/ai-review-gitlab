@@ -174,7 +174,9 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 			expectedStatus = http.StatusBadRequest
 		case "/api/v1/admin/push-review-log/get",
 			"/api/v1/admin/merge-request-review-log/get",
-			"/api/v1/admin/review-log/get-share-token":
+			"/api/v1/admin/review-log/get-share-token",
+			"/api/v1/admin/ai-review-trace/create",
+			"/api/v1/admin/ai-review-trace/get":
 			expectedStatus = http.StatusBadRequest
 		case "/api/v1/admin/push-review-log/search",
 			"/api/v1/admin/push-review-log/authors",
@@ -201,6 +203,7 @@ func newContractRouter() *gin.Engine {
 		ProjectGitLabHandler: handler.NewProjectGitLabHandler(&contractProjectGitLabService{}),
 		LLMModelHandler:      handler.NewLLMModelHandler(&contractLLMModelService{}),
 		ReviewLogHandler:     handler.NewReviewLogHandler(&contractReviewLogService{}),
+		AIReviewTraceHandler: handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
 		OpenReportHandler:    handler.NewOpenReportHandler(&contractOpenReportService{}),
 		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
 			subject: &service.AuthSubject{
@@ -391,4 +394,14 @@ type contractOpenReportService struct{}
 
 func (s *contractOpenReportService) CodeReviewReport(ctx context.Context, input service.CodeReviewReportInput) (string, error) {
 	return "", service.ErrInvalidReviewLogInput
+}
+
+type contractAIReviewTraceService struct{}
+
+func (s *contractAIReviewTraceService) Create(ctx context.Context, input service.AIReviewTraceInput) (*service.AIReviewTrace, error) {
+	return nil, service.ErrInvalidAIReviewTraceInput
+}
+
+func (s *contractAIReviewTraceService) Get(ctx context.Context, eventType string, eventID uint) (*service.AIReviewTrace, error) {
+	return nil, service.ErrInvalidAIReviewTraceInput
 }
