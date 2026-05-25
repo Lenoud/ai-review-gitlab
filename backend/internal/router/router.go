@@ -19,6 +19,7 @@ type Dependencies struct {
 	ProjectGitLabHandler *handler.ProjectGitLabHandler
 	LLMModelHandler      *handler.LLMModelHandler
 	ReviewLogHandler     *handler.ReviewLogHandler
+	OpenReportHandler    *handler.OpenReportHandler
 	WebhookHandler       *handler.WebhookHandler
 	AuthMiddleware       gin.HandlerFunc
 }
@@ -41,7 +42,7 @@ func registerPublicRoutes(r *gin.Engine, deps Dependencies) {
 		open.POST("/auth/refresh", deps.AuthHandler.Refresh)
 		open.POST("/auth/logout", deps.AuthHandler.Logout)
 		open.GET("/system/info", handler.SystemInfo)
-		open.GET("/code-review-report", handler.NotImplemented)
+		open.GET("/code-review-report", deps.OpenReportHandler.CodeReviewReport)
 		open.GET("/analysis-report", handler.NotImplemented)
 	}
 

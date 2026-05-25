@@ -201,6 +201,7 @@ func newContractRouter() *gin.Engine {
 		ProjectGitLabHandler: handler.NewProjectGitLabHandler(&contractProjectGitLabService{}),
 		LLMModelHandler:      handler.NewLLMModelHandler(&contractLLMModelService{}),
 		ReviewLogHandler:     handler.NewReviewLogHandler(&contractReviewLogService{}),
+		OpenReportHandler:    handler.NewOpenReportHandler(&contractOpenReportService{}),
 		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
 			subject: &service.AuthSubject{
 				UserID:   1,
@@ -384,4 +385,10 @@ func (s *contractReviewLogService) GenerateMergeRequestShareToken(ctx context.Co
 
 func (s *contractReviewLogService) GetShareToken(ctx context.Context, eventType string, eventID uint) (*service.ReviewLogShareToken, error) {
 	return nil, service.ErrInvalidReviewLogInput
+}
+
+type contractOpenReportService struct{}
+
+func (s *contractOpenReportService) CodeReviewReport(ctx context.Context, input service.CodeReviewReportInput) (string, error) {
+	return "", service.ErrInvalidReviewLogInput
 }
