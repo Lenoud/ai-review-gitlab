@@ -69,15 +69,17 @@ handler → service → repository → model
 
 ## 2. 数据库设计
 
-### 15 张业务表
+### 20 张业务表
 
 **核心审查**：
 
 | 表名 | 关键字段 |
 |------|------|
 | `project` | id, name, description, webUrl, platform, accessToken, imEnabled, imRobotId, imAtMemberEnabled, imAtMemberScoreThreshold, aiReviewEnabled, templateId, extensions, reviewEventTypes, reviewPromptTemplate, htmlReportEnabled, deepReviewEnabled（字段保留但 V1 不使用） |
-| `push_review_log` | id, projectId, projectName, author, authorIdentity, authorDisplayName, branch, commitMessages, commits(JSON), score, additions, deletions, lastCommitUrl, shareToken, shareTokenExpiresAt |
-| `merge_request_review_log` | id, projectId, projectName, author, authorIdentity, authorDisplayName, sourceBranch, targetBranch, commitMessages, score, additions, deletions, lastCommitId, url, shareToken, shareTokenExpiresAt |
+| `review_task` | id, projectId, eventType(push/merge_request/manual), dedupeKey(unique), payloadJson, status(pending/running/succeeded/failed/canceled), priority, attempts, maxAttempts, nextRunAt, lockedBy, lockedAt, startedAt, finishedAt, errorMessage, resultLogType, resultLogId |
+| `review_task_attempt` | id, taskId, attemptNo, status(running/succeeded/failed), startedAt, finishedAt, durationMs, errorMessage, errorStack |
+| `push_review_log` | id, taskId(nullable), projectId, projectName, author, authorIdentity, authorDisplayName, branch, commitMessages, commits(JSON), score, additions, deletions, lastCommitUrl, shareToken, shareTokenExpiresAt |
+| `merge_request_review_log` | id, taskId(nullable), projectId, projectName, author, authorIdentity, authorDisplayName, sourceBranch, targetBranch, commitMessages, score, additions, deletions, lastCommitId, url, shareToken, shareTokenExpiresAt |
 | `ai_review_trace` | id, reviewEventType, reviewEventId, prompt, response, provider, modelCode |
 | `llm_model` | id, provider, modelCode, apiBaseUrl, apiKey, maxTokens, isDefault |
 
@@ -126,7 +128,7 @@ handler → service → repository → model
 
 ### 表结构
 
-直接复用 `init.sql` 中的字段定义，不做修改。初始数据也复用：
+业务表字段以本设计为准，`init.sql` 只作为旧系统能力和字段命名参考，不作为强制兼容约束。初始数据参考复用：
 
 - `project_template`：4 条（Java/Vue/Go/全栈通用）
 - `sys_role`：超级管理员
@@ -144,21 +146,46 @@ GitLab Push/MR Event
        │
        ▼
   handler/webhook_handler.go
-       │ 解析 payload，立即返回 200
-       │ goroutine 异步处理（semaphore 控制并发）
+       │ 解析 payload，匹配 project，生成 dedupeKey
+       │ 写入 review_task(status=pending)
+       │ 重复事件命中 dedupeKey 时返回已有 taskId
+       │ 入库成功后立即返回 200/202
+       ▼
+  review_task_worker
+       │ 从 MySQL 拉取 pending 任务
+       │ 使用 FOR UPDATE SKIP LOCKED 抢占任务
        ▼
   service/review_service.go
        │
-       ├── 1. 根据 webUrl 查 project 表获取配置
-       ├── 2. platform/gitlab.go 调 GitLab API 获取 diff
-       ├── 3. 按 extensions 过滤 diff 文件
-       ├── 4. 组装 prompt（模板 + 规则 + diff + commit 信息）
-       ├── 5. llm/client.go 调 OpenAI 兼容 API
-       ├── 6. 解析评分，保存 review log
-       ├── 7. platform/gitlab.go 回评到 GitLab（MR 评论/Commit 评论）
-       ├── 8. 如果 htmlReportEnabled：llm 生成 HTML → 存文件系统
-       └── 9. 如果 imEnabled：notify/sender.go 发 IM 通知
+       ├── 1. 记录 review_task_attempt
+       ├── 2. 根据 projectId 获取项目配置
+       ├── 3. platform/gitlab.go 调 GitLab API 获取 diff
+       ├── 4. 按 extensions 过滤 diff 文件
+       ├── 5. 组装 prompt（模板 + 规则 + diff + commit 信息）
+       ├── 6. llm/client.go 调 OpenAI 兼容 API
+       ├── 7. 解析评分，保存 review log，并回写 resultLogType/resultLogId
+       ├── 8. platform/gitlab.go 回评到 GitLab（MR 评论/Commit 评论）
+       ├── 9. 如果 htmlReportEnabled：llm 生成 HTML → 存文件系统
+       ├── 10. 如果 imEnabled：notify/sender.go 发 IM 通知
+       └── 11. 更新 review_task 为 succeeded 或按退避策略重试/failed
 ```
+
+任务去重：
+
+- Push：`gitlab:push:{projectId}:{ref}:{afterSha}`
+- Merge Request：`gitlab:mr:{projectId}:{mergeRequestIid}:{lastCommitSha}:{action}`
+- `review_task.dedupe_key` 建唯一索引。重复 Webhook 不创建新任务，直接返回已有任务。
+
+任务重试：
+
+- `maxAttempts` 默认 3。
+- 执行失败时 `attempts + 1`，未超过上限则回到 `pending`，并设置 `nextRunAt` 为指数退避时间。
+- 超过上限后标记为 `failed`，错误摘要写入 `errorMessage`，详细错误写入 `review_task_attempt.errorStack`。
+
+任务恢复：
+
+- Worker 启动后定期扫描超时的 `running` 任务。
+- `lockedAt` 超过 30 分钟仍未完成的任务视为卡住，重置为 `pending` 并等待重新执行。
 
 ### 3.2 定时分析流程
 
@@ -469,7 +496,7 @@ RBAC 路由组（需要特定权限）
 
 | 项 | 决策 | 理由 |
 |------|------|------|
-| Webhook 异步 | goroutine + semaphore.Weighted | 防止大量 Webhook 同时打满 LLM API |
+| Webhook 异步 | MySQL 轻量任务队列 + 后台 worker | Webhook 先落库再返回，避免进程重启/崩溃导致审查任务丢失；worker 控制并发、重试和失败记录 |
 | 定时任务 | robfig/cron/v3 | 进程内调度，从数据库动态加载计划 |
 | LLM 调用 | 非流式，单次 /chat/completions | V1 只做审查和分析，不需要流式 |
 | 密码存储 | golang.org/x/crypto/bcrypt | 与原版一致 |
@@ -478,7 +505,7 @@ RBAC 路由组（需要特定权限）
 | HTML 报告存储 | 定义 HtmlReportStorage 接口 | V1 实现为本地文件系统，后续可切换到 S3/MinIO。接口隔离实现 |
 | 分享 Token | UUID，7 天过期，存数据库 | 与原版一致 |
 | 项目代码拉取 | 调用系统 git 命令 | 比 go-git 更稳定，支持所有 Git 特性。代码存储在 `{data_dir}/projects/{projectId}/`。大型仓库不特殊处理，自然克隆 |
-| Graceful shutdown | 监听 SIGTERM，等待进行中的 Webhook 和 cron 任务完成 | 使用 `sync.WaitGroup` 跟踪进行中的 goroutine，shutdown 时 Wait 或超时强制退出 |
+| Graceful shutdown | 监听 SIGTERM，停止接收新任务，并等待进行中的 worker 和 cron 任务完成 | 使用 `sync.WaitGroup` 跟踪后台任务，shutdown 时 Wait 或超时强制退出 |
 | 应急管理员密码 | config.yaml 中明文 + 支持环境变量覆盖 | 环境变量 `ADMIN_PASSWORD` 优先于配置文件，避免密码意外提交到版本库 |
 
 ### Go 依赖（11 个）
