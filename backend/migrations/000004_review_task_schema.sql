@@ -1,0 +1,46 @@
+CREATE TABLE IF NOT EXISTS review_task (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  project_id BIGINT UNSIGNED NOT NULL,
+  event_type VARCHAR(32) NOT NULL,
+  dedupe_key VARCHAR(255) NOT NULL,
+  payload_json JSON NULL,
+  status VARCHAR(32) NOT NULL,
+  priority INT NOT NULL DEFAULT 0,
+  attempts INT NOT NULL DEFAULT 0,
+  max_attempts INT NOT NULL DEFAULT 3,
+  next_run_at DATETIME(3) NOT NULL,
+  locked_by VARCHAR(128) NOT NULL DEFAULT '',
+  locked_at DATETIME(3) NULL,
+  started_at DATETIME(3) NULL,
+  finished_at DATETIME(3) NULL,
+  error_message VARCHAR(1024) NOT NULL DEFAULT '',
+  result_log_type VARCHAR(32) NOT NULL DEFAULT '',
+  result_log_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  created_at DATETIME(3) NULL,
+  updated_at DATETIME(3) NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_review_task_dedupe_key (dedupe_key),
+  KEY idx_review_task_project_id (project_id),
+  KEY idx_review_task_event_type (event_type),
+  KEY idx_review_task_status (status),
+  KEY idx_review_task_priority (priority),
+  KEY idx_review_task_next_run_at (next_run_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS review_task_attempt (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  task_id BIGINT UNSIGNED NOT NULL,
+  attempt_no INT NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  started_at DATETIME(3) NOT NULL,
+  finished_at DATETIME(3) NULL,
+  duration_ms BIGINT NOT NULL DEFAULT 0,
+  error_message VARCHAR(1024) NOT NULL DEFAULT '',
+  error_stack TEXT NULL,
+  created_at DATETIME(3) NULL,
+  updated_at DATETIME(3) NULL,
+  PRIMARY KEY (id),
+  KEY idx_review_task_attempt_task_id (task_id),
+  KEY idx_review_task_attempt_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

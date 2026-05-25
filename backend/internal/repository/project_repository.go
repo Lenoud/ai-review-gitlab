@@ -95,6 +95,18 @@ func (r *ProjectRepository) FindByID(ctx context.Context, id uint) (*service.Pro
 	return projectModelToService(&record)
 }
 
+func (r *ProjectRepository) FindByWebURL(ctx context.Context, webURL string) (*service.Project, error) {
+	var record model.Project
+	err := r.db.WithContext(ctx).Where("web_url = ?", webURL).First(&record).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, service.ErrProjectNotFound
+		}
+		return nil, err
+	}
+	return projectModelToService(&record)
+}
+
 func (r *ProjectRepository) Delete(ctx context.Context, ids []uint) error {
 	return r.db.WithContext(ctx).Delete(&model.Project{}, ids).Error
 }

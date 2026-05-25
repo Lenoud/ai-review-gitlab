@@ -144,6 +144,15 @@ func (r *memoryProjectRepository) FindByID(ctx context.Context, id uint) (*Proje
 	return cloneProject(project), nil
 }
 
+func (r *memoryProjectRepository) FindByWebURL(ctx context.Context, webURL string) (*Project, error) {
+	for _, project := range r.projects {
+		if project.WebURL == webURL {
+			return cloneProject(project), nil
+		}
+	}
+	return nil, ErrProjectNotFound
+}
+
 func (r *memoryProjectRepository) Delete(ctx context.Context, ids []uint) error {
 	for _, id := range ids {
 		delete(r.projects, id)
@@ -188,6 +197,9 @@ func (r *projectRepositoryWithError) Update(ctx context.Context, id uint, input 
 	return nil, r.err
 }
 func (r *projectRepositoryWithError) FindByID(ctx context.Context, id uint) (*Project, error) {
+	return nil, r.err
+}
+func (r *projectRepositoryWithError) FindByWebURL(ctx context.Context, webURL string) (*Project, error) {
 	return nil, r.err
 }
 func (r *projectRepositoryWithError) Delete(ctx context.Context, ids []uint) error {

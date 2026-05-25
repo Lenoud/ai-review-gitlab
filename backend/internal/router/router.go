@@ -17,6 +17,7 @@ type Dependencies struct {
 	AuthHandler     *handler.AuthHandler
 	ProjectHandler  *handler.ProjectHandler
 	LLMModelHandler *handler.LLMModelHandler
+	WebhookHandler  *handler.WebhookHandler
 	AuthMiddleware  gin.HandlerFunc
 }
 
@@ -42,7 +43,7 @@ func registerPublicRoutes(r *gin.Engine, deps Dependencies) {
 		open.GET("/analysis-report", handler.NotImplemented)
 	}
 
-	r.POST("/review/webhook", handler.NotImplemented)
+	r.POST("/review/webhook", deps.WebhookHandler.GitLab)
 }
 
 func registerAdminRoutes(r *gin.Engine, deps Dependencies) {

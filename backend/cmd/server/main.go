@@ -55,14 +55,17 @@ func main() {
 	}
 
 	projectSvc := service.NewProjectService(repository.NewProjectRepository(db))
+	reviewTaskSvc := service.NewReviewTaskService(repository.NewProjectRepository(db), repository.NewReviewTaskRepository(db), service.ReviewTaskOptions{})
 	llmModelSvc := service.NewLLMModelService(repository.NewLLMModelRepository(db), llm.NewOpenAICompatibleChecker(nil))
 	authHandler := handler.NewAuthHandler(authSvc)
 	projectHandler := handler.NewProjectHandler(projectSvc)
 	llmModelHandler := handler.NewLLMModelHandler(llmModelSvc)
+	webhookHandler := handler.NewWebhookHandler(reviewTaskSvc)
 	r := router.New(router.Dependencies{
 		AuthHandler:     authHandler,
 		ProjectHandler:  projectHandler,
 		LLMModelHandler: llmModelHandler,
+		WebhookHandler:  webhookHandler,
 		AuthMiddleware:  middleware.JWTAuth(authSvc),
 	})
 	if err := r.Run(cfg.Server.Address()); err != nil {

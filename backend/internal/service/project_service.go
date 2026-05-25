@@ -73,6 +73,7 @@ type ProjectRepository interface {
 	BatchCreate(ctx context.Context, inputs []ProjectInput) ([]Project, error)
 	Update(ctx context.Context, id uint, input ProjectInput) (*Project, error)
 	FindByID(ctx context.Context, id uint) (*Project, error)
+	FindByWebURL(ctx context.Context, webURL string) (*Project, error)
 	Delete(ctx context.Context, ids []uint) error
 	Search(ctx context.Context, query ProjectSearchQuery) (*ProjectPage, error)
 	ExistsByWebURL(ctx context.Context, webURL string, excludeID uint) (bool, error)
