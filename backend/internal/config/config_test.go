@@ -12,5 +12,33 @@ func TestLoadDefaults(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 8080, cfg.Server.Port)
 	require.Equal(t, "0.0.0.0", cfg.Server.Host)
+	require.Equal(t, "127.0.0.1", cfg.Database.Host)
+	require.Equal(t, 3306, cfg.Database.Port)
+	require.Equal(t, "ai_review", cfg.Database.DBName)
 	require.Equal(t, "ai-review", cfg.Auth.Issuer)
+	require.Equal(t, "admin", cfg.Auth.AdminUsername)
+	require.Equal(t, "admin123", cfg.Auth.AdminPassword)
+	require.Equal(t, "30m", cfg.Auth.AccessTokenTTL)
+	require.Equal(t, "720h", cfg.Auth.RefreshTokenTTL)
+}
+
+func TestLoadEnvOverridesForDatabaseAndAdmin(t *testing.T) {
+	t.Setenv("DATABASE_HOST", "mysql.internal")
+	t.Setenv("DATABASE_PORT", "3307")
+	t.Setenv("DATABASE_USERNAME", "review_user")
+	t.Setenv("DATABASE_PASSWORD", "secret")
+	t.Setenv("DATABASE_DBNAME", "review_db")
+	t.Setenv("AUTH_ADMIN_USERNAME", "root")
+	t.Setenv("AUTH_ADMIN_PASSWORD", "root-password")
+
+	cfg, err := Load()
+
+	require.NoError(t, err)
+	require.Equal(t, "mysql.internal", cfg.Database.Host)
+	require.Equal(t, 3307, cfg.Database.Port)
+	require.Equal(t, "review_user", cfg.Database.Username)
+	require.Equal(t, "secret", cfg.Database.Password)
+	require.Equal(t, "review_db", cfg.Database.DBName)
+	require.Equal(t, "root", cfg.Auth.AdminUsername)
+	require.Equal(t, "root-password", cfg.Auth.AdminPassword)
 }

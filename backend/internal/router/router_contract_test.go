@@ -1,18 +1,22 @@
 package router
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/Lenoud/ai-review-gitlab/backend/internal/handler"
+	"github.com/Lenoud/ai-review-gitlab/backend/internal/middleware"
+	"github.com/Lenoud/ai-review-gitlab/backend/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPublicRoutesAreRegistered(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	r := New()
+	r := newContractRouter()
 
 	tests := []struct {
 		method string
@@ -38,7 +42,7 @@ func TestPublicRoutesAreRegistered(t *testing.T) {
 
 func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	r := New()
+	r := newContractRouter()
 
 	routes := []struct {
 		method string
@@ -143,8 +147,62 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 
 		w = httptest.NewRecorder()
 		req = httptest.NewRequest(route.method, route.path, strings.NewReader(route.body))
-		req.Header.Set("Authorization", "Bearer dev")
+		req.Header.Set("Authorization", "Bearer access-token")
 		r.ServeHTTP(w, req)
-		require.Equal(t, http.StatusNotImplemented, w.Code, "%s %s with token", route.method, route.path)
+		expectedStatus := http.StatusNotImplemented
+		if route.path == "/api/v1/admin/auth/me" {
+			expectedStatus = http.StatusOK
+		}
+		require.Equal(t, expectedStatus, w.Code, "%s %s with token", route.method, route.path)
 	}
+}
+
+func newContractRouter() *gin.Engine {
+	return New(Dependencies{
+		AuthHandler: NewAuthHandlerForTest(),
+		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
+			subject: &service.AuthSubject{
+				UserID:   1,
+				Username: "admin",
+				Nickname: "Administrator",
+			},
+		}),
+	})
+}
+
+func NewAuthHandlerForTest() *handler.AuthHandler {
+	return handler.NewAuthHandler(&contractAuthService{})
+}
+
+type contractAuthService struct{}
+
+func (s *contractAuthService) Login(ctx context.Context, input service.LoginInput) (*service.TokenPair, error) {
+	return &service.TokenPair{
+		AccessToken:      "access-token",
+		RefreshToken:     "refresh-token",
+		TokenType:        "Bearer",
+		ExpiresIn:        1800,
+		RefreshExpiresIn: 2592000,
+	}, nil
+}
+
+func (s *contractAuthService) Refresh(ctx context.Context, refreshToken string) (*service.TokenPair, error) {
+	return &service.TokenPair{
+		AccessToken:      "new-access-token",
+		RefreshToken:     "new-refresh-token",
+		TokenType:        "Bearer",
+		ExpiresIn:        1800,
+		RefreshExpiresIn: 2592000,
+	}, nil
+}
+
+type contractTokenValidator struct {
+	subject *service.AuthSubject
+}
+
+func (v *contractTokenValidator) ValidateAccessToken(ctx context.Context, token string) (*service.AuthSubject, error) {
+	if strings.TrimSpace(token) == "" {
+		return nil, service.ErrInvalidToken
+	}
+	return v.subject, nil
 }

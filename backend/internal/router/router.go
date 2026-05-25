@@ -13,23 +13,28 @@ type routeDef struct {
 	path   string
 }
 
-func New() *gin.Engine {
+type Dependencies struct {
+	AuthHandler    *handler.AuthHandler
+	AuthMiddleware gin.HandlerFunc
+}
+
+func New(deps Dependencies) *gin.Engine {
 	r := gin.New()
 	r.Use(middleware.Recovery())
 	r.Use(middleware.RequestLogger())
 
-	registerPublicRoutes(r)
-	registerAdminRoutes(r)
+	registerPublicRoutes(r, deps)
+	registerAdminRoutes(r, deps)
 
 	return r
 }
 
-func registerPublicRoutes(r *gin.Engine) {
+func registerPublicRoutes(r *gin.Engine, deps Dependencies) {
 	open := r.Group("/api/v1/open")
 	{
-		open.POST("/auth/login", handler.NotImplemented)
-		open.POST("/auth/refresh", handler.NotImplemented)
-		open.POST("/auth/logout", handler.NotImplemented)
+		open.POST("/auth/login", deps.AuthHandler.Login)
+		open.POST("/auth/refresh", deps.AuthHandler.Refresh)
+		open.POST("/auth/logout", deps.AuthHandler.Logout)
 		open.GET("/system/info", handler.SystemInfo)
 		open.GET("/code-review-report", handler.NotImplemented)
 		open.GET("/analysis-report", handler.NotImplemented)
@@ -38,9 +43,10 @@ func registerPublicRoutes(r *gin.Engine) {
 	r.POST("/review/webhook", handler.NotImplemented)
 }
 
-func registerAdminRoutes(r *gin.Engine) {
+func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 	admin := r.Group("/api/v1/admin")
-	admin.Use(middleware.JWTAuth())
+	admin.Use(deps.AuthMiddleware)
+	admin.GET("/auth/me", deps.AuthHandler.Me)
 	registerRoutes(admin, []routeDef{
 		{http.MethodPost, "/project/create"},
 		{http.MethodPost, "/project/batch-create"},
@@ -129,7 +135,6 @@ func registerAdminRoutes(r *gin.Engine) {
 		{http.MethodGet, "/role/get"},
 		{http.MethodPost, "/role/delete"},
 		{http.MethodGet, "/role/menu-permissions"},
-		{http.MethodGet, "/auth/me"},
 
 		{http.MethodGet, "/stats"},
 		{http.MethodGet, "/member/commit-summary"},

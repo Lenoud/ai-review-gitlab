@@ -8,9 +8,10 @@ import (
 )
 
 type Config struct {
-	Server ServerConfig `mapstructure:"server"`
-	Auth   AuthConfig   `mapstructure:"auth"`
-	Log    LogConfig    `mapstructure:"log"`
+	Server   ServerConfig   `mapstructure:"server"`
+	Database DatabaseConfig `mapstructure:"database"`
+	Auth     AuthConfig     `mapstructure:"auth"`
+	Log      LogConfig      `mapstructure:"log"`
 }
 
 type ServerConfig struct {
@@ -27,6 +28,21 @@ type AuthConfig struct {
 	AccessTokenTTL  string `mapstructure:"access_token_ttl"`
 	RefreshTokenTTL string `mapstructure:"refresh_token_ttl"`
 	Issuer          string `mapstructure:"issuer"`
+	AdminUsername   string `mapstructure:"admin_username"`
+	AdminPassword   string `mapstructure:"admin_password"`
+}
+
+type DatabaseConfig struct {
+	Host         string `mapstructure:"host"`
+	Port         int    `mapstructure:"port"`
+	Username     string `mapstructure:"username"`
+	Password     string `mapstructure:"password"`
+	DBName       string `mapstructure:"dbname"`
+	Charset      string `mapstructure:"charset"`
+	ParseTime    bool   `mapstructure:"parse_time"`
+	Loc          string `mapstructure:"loc"`
+	MaxIdleConns int    `mapstructure:"max_idle_conns"`
+	MaxOpenConns int    `mapstructure:"max_open_conns"`
 }
 
 type LogConfig struct {
@@ -44,10 +60,22 @@ func Load() (*Config, error) {
 
 	v.SetDefault("server.host", "0.0.0.0")
 	v.SetDefault("server.port", 8080)
+	v.SetDefault("database.host", "127.0.0.1")
+	v.SetDefault("database.port", 3306)
+	v.SetDefault("database.username", "root")
+	v.SetDefault("database.password", "")
+	v.SetDefault("database.dbname", "ai_review")
+	v.SetDefault("database.charset", "utf8mb4")
+	v.SetDefault("database.parse_time", true)
+	v.SetDefault("database.loc", "Local")
+	v.SetDefault("database.max_idle_conns", 10)
+	v.SetDefault("database.max_open_conns", 50)
 	v.SetDefault("auth.jwt_secret", "dev-secret")
 	v.SetDefault("auth.access_token_ttl", "30m")
 	v.SetDefault("auth.refresh_token_ttl", "720h")
 	v.SetDefault("auth.issuer", "ai-review")
+	v.SetDefault("auth.admin_username", "admin")
+	v.SetDefault("auth.admin_password", "admin123")
 	v.SetDefault("log.level", "info")
 	v.SetDefault("log.format", "json")
 
