@@ -14,9 +14,10 @@ type routeDef struct {
 }
 
 type Dependencies struct {
-	AuthHandler    *handler.AuthHandler
-	ProjectHandler *handler.ProjectHandler
-	AuthMiddleware gin.HandlerFunc
+	AuthHandler     *handler.AuthHandler
+	ProjectHandler  *handler.ProjectHandler
+	LLMModelHandler *handler.LLMModelHandler
+	AuthMiddleware  gin.HandlerFunc
 }
 
 func New(deps Dependencies) *gin.Engine {
@@ -49,6 +50,7 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 	admin.Use(deps.AuthMiddleware)
 	admin.GET("/auth/me", deps.AuthHandler.Me)
 	registerProjectRoutes(admin, deps.ProjectHandler)
+	registerLLMModelRoutes(admin, deps.LLMModelHandler)
 	registerRoutes(admin, []routeDef{
 		{http.MethodPost, "/project/gitlab/remote-search"},
 		{http.MethodPost, "/project/gitlab/group-search"},
@@ -73,15 +75,6 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 
 		{http.MethodPost, "/ai-review-trace/create"},
 		{http.MethodGet, "/ai-review-trace/get"},
-
-		{http.MethodPost, "/llm-model/create"},
-		{http.MethodPost, "/llm-model/update"},
-		{http.MethodGet, "/llm-model/get"},
-		{http.MethodPost, "/llm-model/delete"},
-		{http.MethodGet, "/llm-model/search"},
-		{http.MethodGet, "/llm-model/default"},
-		{http.MethodPost, "/llm-model/set-default"},
-		{http.MethodPost, "/llm-test/connection"},
 
 		{http.MethodPost, "/im-robot/create"},
 		{http.MethodPost, "/im-robot/update"},
@@ -150,6 +143,17 @@ func registerProjectRoutes(group *gin.RouterGroup, projectHandler *handler.Proje
 	group.POST("/project/delete", projectHandler.Delete)
 	group.GET("/project/search", projectHandler.Search)
 	group.POST("/project/web-urls/exists", projectHandler.WebURLExists)
+}
+
+func registerLLMModelRoutes(group *gin.RouterGroup, llmModelHandler *handler.LLMModelHandler) {
+	group.POST("/llm-model/create", llmModelHandler.Create)
+	group.POST("/llm-model/update", llmModelHandler.Update)
+	group.GET("/llm-model/get", llmModelHandler.Get)
+	group.POST("/llm-model/delete", llmModelHandler.Delete)
+	group.GET("/llm-model/search", llmModelHandler.Search)
+	group.GET("/llm-model/default", llmModelHandler.Default)
+	group.POST("/llm-model/set-default", llmModelHandler.SetDefault)
+	group.POST("/llm-test/connection", llmModelHandler.TestConnection)
 }
 
 func registerRoutes(group *gin.RouterGroup, routes []routeDef) {

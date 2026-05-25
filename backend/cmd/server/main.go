@@ -8,6 +8,7 @@ import (
 	"github.com/Lenoud/ai-review-gitlab/backend/internal/config"
 	"github.com/Lenoud/ai-review-gitlab/backend/internal/database"
 	"github.com/Lenoud/ai-review-gitlab/backend/internal/handler"
+	"github.com/Lenoud/ai-review-gitlab/backend/internal/llm"
 	"github.com/Lenoud/ai-review-gitlab/backend/internal/middleware"
 	"github.com/Lenoud/ai-review-gitlab/backend/internal/repository"
 	"github.com/Lenoud/ai-review-gitlab/backend/internal/router"
@@ -54,12 +55,15 @@ func main() {
 	}
 
 	projectSvc := service.NewProjectService(repository.NewProjectRepository(db))
+	llmModelSvc := service.NewLLMModelService(repository.NewLLMModelRepository(db), llm.NewOpenAICompatibleChecker(nil))
 	authHandler := handler.NewAuthHandler(authSvc)
 	projectHandler := handler.NewProjectHandler(projectSvc)
+	llmModelHandler := handler.NewLLMModelHandler(llmModelSvc)
 	r := router.New(router.Dependencies{
-		AuthHandler:    authHandler,
-		ProjectHandler: projectHandler,
-		AuthMiddleware: middleware.JWTAuth(authSvc),
+		AuthHandler:     authHandler,
+		ProjectHandler:  projectHandler,
+		LLMModelHandler: llmModelHandler,
+		AuthMiddleware:  middleware.JWTAuth(authSvc),
 	})
 	if err := r.Run(cfg.Server.Address()); err != nil {
 		log.Fatalf("run server: %v", err)

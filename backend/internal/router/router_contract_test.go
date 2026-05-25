@@ -161,6 +161,15 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 			"/api/v1/admin/project/search",
 			"/api/v1/admin/project/web-urls/exists":
 			expectedStatus = http.StatusBadRequest
+		case "/api/v1/admin/llm-model/create",
+			"/api/v1/admin/llm-model/update",
+			"/api/v1/admin/llm-model/get",
+			"/api/v1/admin/llm-model/delete",
+			"/api/v1/admin/llm-model/search",
+			"/api/v1/admin/llm-model/default",
+			"/api/v1/admin/llm-model/set-default",
+			"/api/v1/admin/llm-test/connection":
+			expectedStatus = http.StatusBadRequest
 		}
 		require.Equal(t, expectedStatus, w.Code, "%s %s with token", route.method, route.path)
 	}
@@ -168,8 +177,9 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 
 func newContractRouter() *gin.Engine {
 	return New(Dependencies{
-		AuthHandler:    NewAuthHandlerForTest(),
-		ProjectHandler: handler.NewProjectHandler(&contractProjectService{}),
+		AuthHandler:     NewAuthHandlerForTest(),
+		ProjectHandler:  handler.NewProjectHandler(&contractProjectService{}),
+		LLMModelHandler: handler.NewLLMModelHandler(&contractLLMModelService{}),
 		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
 			subject: &service.AuthSubject{
 				UserID:   1,
@@ -245,4 +255,38 @@ func (s *contractProjectService) Search(ctx context.Context, query service.Proje
 
 func (s *contractProjectService) WebURLExists(ctx context.Context, webURL string, excludeID uint) (bool, error) {
 	return false, service.ErrInvalidProjectInput
+}
+
+type contractLLMModelService struct{}
+
+func (s *contractLLMModelService) Create(ctx context.Context, input service.LLMModelInput) (*service.LLMModel, error) {
+	return nil, service.ErrInvalidLLMModelInput
+}
+
+func (s *contractLLMModelService) Update(ctx context.Context, id uint, input service.LLMModelInput) (*service.LLMModel, error) {
+	return nil, service.ErrInvalidLLMModelInput
+}
+
+func (s *contractLLMModelService) Get(ctx context.Context, id uint) (*service.LLMModel, error) {
+	return nil, service.ErrInvalidLLMModelInput
+}
+
+func (s *contractLLMModelService) Delete(ctx context.Context, ids []uint) error {
+	return service.ErrInvalidLLMModelInput
+}
+
+func (s *contractLLMModelService) Search(ctx context.Context, query service.LLMModelSearchQuery) (*service.LLMModelPage, error) {
+	return nil, service.ErrInvalidLLMModelInput
+}
+
+func (s *contractLLMModelService) Default(ctx context.Context) (*service.LLMModel, error) {
+	return nil, service.ErrInvalidLLMModelInput
+}
+
+func (s *contractLLMModelService) SetDefault(ctx context.Context, id uint) error {
+	return service.ErrInvalidLLMModelInput
+}
+
+func (s *contractLLMModelService) TestConnection(ctx context.Context, input service.LLMConnectionInput) error {
+	return service.ErrInvalidLLMModelInput
 }

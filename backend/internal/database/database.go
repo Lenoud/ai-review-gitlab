@@ -63,5 +63,6 @@ func AutoMigrate(db *gorm.DB) error {
 		&model.SysUserRole{},
 		&model.SysRolePermission{},
 		&model.Project{},
+		&model.LLMModel{},
 	)
 }
