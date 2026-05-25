@@ -53,9 +53,12 @@ func main() {
 		log.Fatalf("init auth service: %v", err)
 	}
 
+	projectSvc := service.NewProjectService(repository.NewProjectRepository(db))
 	authHandler := handler.NewAuthHandler(authSvc)
+	projectHandler := handler.NewProjectHandler(projectSvc)
 	r := router.New(router.Dependencies{
 		AuthHandler:    authHandler,
+		ProjectHandler: projectHandler,
 		AuthMiddleware: middleware.JWTAuth(authSvc),
 	})
 	if err := r.Run(cfg.Server.Address()); err != nil {

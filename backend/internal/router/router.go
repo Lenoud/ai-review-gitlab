@@ -15,6 +15,7 @@ type routeDef struct {
 
 type Dependencies struct {
 	AuthHandler    *handler.AuthHandler
+	ProjectHandler *handler.ProjectHandler
 	AuthMiddleware gin.HandlerFunc
 }
 
@@ -47,16 +48,10 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 	admin := r.Group("/api/v1/admin")
 	admin.Use(deps.AuthMiddleware)
 	admin.GET("/auth/me", deps.AuthHandler.Me)
+	registerProjectRoutes(admin, deps.ProjectHandler)
 	registerRoutes(admin, []routeDef{
-		{http.MethodPost, "/project/create"},
-		{http.MethodPost, "/project/batch-create"},
-		{http.MethodPost, "/project/update"},
-		{http.MethodGet, "/project/get"},
-		{http.MethodPost, "/project/delete"},
-		{http.MethodGet, "/project/search"},
 		{http.MethodPost, "/project/gitlab/remote-search"},
 		{http.MethodPost, "/project/gitlab/group-search"},
-		{http.MethodPost, "/project/web-urls/exists"},
 		{http.MethodGet, "/project/review-prompt/get"},
 		{http.MethodGet, "/project/review-prompt/default"},
 		{http.MethodPost, "/project/review-prompt/update"},
@@ -145,6 +140,16 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 		{http.MethodPost, "/system/config/base-url"},
 		{http.MethodGet, "/review-log/get-share-token"},
 	})
+}
+
+func registerProjectRoutes(group *gin.RouterGroup, projectHandler *handler.ProjectHandler) {
+	group.POST("/project/create", projectHandler.Create)
+	group.POST("/project/batch-create", projectHandler.BatchCreate)
+	group.POST("/project/update", projectHandler.Update)
+	group.GET("/project/get", projectHandler.Get)
+	group.POST("/project/delete", projectHandler.Delete)
+	group.GET("/project/search", projectHandler.Search)
+	group.POST("/project/web-urls/exists", projectHandler.WebURLExists)
 }
 
 func registerRoutes(group *gin.RouterGroup, routes []routeDef) {

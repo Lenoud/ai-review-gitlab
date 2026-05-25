@@ -150,8 +150,17 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 		req.Header.Set("Authorization", "Bearer access-token")
 		r.ServeHTTP(w, req)
 		expectedStatus := http.StatusNotImplemented
-		if route.path == "/api/v1/admin/auth/me" {
+		switch route.path {
+		case "/api/v1/admin/auth/me":
 			expectedStatus = http.StatusOK
+		case "/api/v1/admin/project/create",
+			"/api/v1/admin/project/batch-create",
+			"/api/v1/admin/project/update",
+			"/api/v1/admin/project/get",
+			"/api/v1/admin/project/delete",
+			"/api/v1/admin/project/search",
+			"/api/v1/admin/project/web-urls/exists":
+			expectedStatus = http.StatusBadRequest
 		}
 		require.Equal(t, expectedStatus, w.Code, "%s %s with token", route.method, route.path)
 	}
@@ -159,7 +168,8 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 
 func newContractRouter() *gin.Engine {
 	return New(Dependencies{
-		AuthHandler: NewAuthHandlerForTest(),
+		AuthHandler:    NewAuthHandlerForTest(),
+		ProjectHandler: handler.NewProjectHandler(&contractProjectService{}),
 		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
 			subject: &service.AuthSubject{
 				UserID:   1,
@@ -205,4 +215,34 @@ func (v *contractTokenValidator) ValidateAccessToken(ctx context.Context, token 
 		return nil, service.ErrInvalidToken
 	}
 	return v.subject, nil
+}
+
+type contractProjectService struct{}
+
+func (s *contractProjectService) Create(ctx context.Context, input service.ProjectInput) (*service.Project, error) {
+	return nil, service.ErrInvalidProjectInput
+}
+
+func (s *contractProjectService) BatchCreate(ctx context.Context, inputs []service.ProjectInput) ([]service.Project, error) {
+	return nil, service.ErrInvalidProjectInput
+}
+
+func (s *contractProjectService) Update(ctx context.Context, id uint, input service.ProjectInput) (*service.Project, error) {
+	return nil, service.ErrInvalidProjectInput
+}
+
+func (s *contractProjectService) Get(ctx context.Context, id uint) (*service.Project, error) {
+	return nil, service.ErrInvalidProjectInput
+}
+
+func (s *contractProjectService) Delete(ctx context.Context, ids []uint) error {
+	return service.ErrInvalidProjectInput
+}
+
+func (s *contractProjectService) Search(ctx context.Context, query service.ProjectSearchQuery) (*service.ProjectPage, error) {
+	return nil, service.ErrInvalidProjectInput
+}
+
+func (s *contractProjectService) WebURLExists(ctx context.Context, webURL string, excludeID uint) (bool, error) {
+	return false, service.ErrInvalidProjectInput
 }

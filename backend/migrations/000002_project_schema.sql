@@ -1,0 +1,26 @@
+CREATE TABLE IF NOT EXISTS project (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(128) NOT NULL,
+  description VARCHAR(1024) NOT NULL DEFAULT '',
+  web_url VARCHAR(512) NOT NULL,
+  platform VARCHAR(32) NOT NULL DEFAULT 'gitlab',
+  access_token VARCHAR(512) NOT NULL DEFAULT '',
+  im_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  im_robot_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  im_at_member_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  im_at_member_score_threshold INT NOT NULL DEFAULT 0,
+  ai_review_enabled TINYINT(1) NOT NULL DEFAULT 1,
+  template_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  extensions JSON NULL,
+  review_event_types JSON NULL,
+  review_prompt_template TEXT NULL,
+  html_report_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  deep_review_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME(3) NULL,
+  updated_at DATETIME(3) NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_project_web_url (web_url),
+  KEY idx_project_name (name),
+  KEY idx_project_platform (platform)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
