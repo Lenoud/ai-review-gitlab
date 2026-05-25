@@ -471,7 +471,6 @@ RBAC 路由组（需要特定权限）
 |------|------|------|
 | Webhook 异步 | goroutine + semaphore.Weighted | 防止大量 Webhook 同时打满 LLM API |
 | 定时任务 | robfig/cron/v3 | 进程内调度，从数据库动态加载计划 |
-| Cron 兼容性 | 代码中做 Quartz → 标准 cron 转换 | init.sql 中 cronExpression 注释为 Quartz 格式。robfig/cron 不支持 Quartz 的 `?` 和 `周 1-7`。在加载时自动转换：`?` → `*`，周字段 `1-7` → `0-6` |
 | LLM 调用 | 非流式，单次 /chat/completions | V1 只做审查和分析，不需要流式 |
 | 密码存储 | golang.org/x/crypto/bcrypt | 与原版一致 |
 | 数据库迁移 | golang-migrate/migrate | 应用启动时自动执行 |
