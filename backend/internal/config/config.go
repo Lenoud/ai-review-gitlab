@@ -63,7 +63,7 @@ func Load() (*Config, error) {
 	v.SetDefault("database.host", "127.0.0.1")
 	v.SetDefault("database.port", 3306)
 	v.SetDefault("database.username", "root")
-	v.SetDefault("database.password", "")
+	v.SetDefault("database.password", "root123")
 	v.SetDefault("database.dbname", "ai_review")
 	v.SetDefault("database.charset", "utf8mb4")
 	v.SetDefault("database.parse_time", true)
