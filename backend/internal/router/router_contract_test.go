@@ -181,6 +181,14 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 			"/api/v1/admin/llm-model/set-default",
 			"/api/v1/admin/llm-test/connection":
 			expectedStatus = http.StatusBadRequest
+		case "/api/v1/admin/im-robot/create",
+			"/api/v1/admin/im-robot/update",
+			"/api/v1/admin/im-robot/get",
+			"/api/v1/admin/im-robot/delete":
+			expectedStatus = http.StatusBadRequest
+		case "/api/v1/admin/im-robot/search",
+			"/api/v1/admin/im-robot/list-enabled":
+			expectedStatus = http.StatusOK
 		case "/api/v1/admin/push-review-log/get",
 			"/api/v1/admin/merge-request-review-log/get",
 			"/api/v1/admin/review-log/get-share-token",
@@ -246,6 +254,7 @@ func TestAdminProtectedRoutesReturnForbiddenWithoutPermission(t *testing.T) {
 		ReviewLogHandler:                 handler.NewReviewLogHandler(&contractReviewLogService{}),
 		AnalysisLogHandler:               handler.NewAnalysisExecutionLogHandler(&contractAnalysisExecutionLogService{}),
 		AIReviewTraceHandler:             handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
+		IMRobotHandler:                   handler.NewIMRobotHandler(&contractIMRobotService{}),
 		OpenReportHandler:                handler.NewOpenReportHandler(&contractOpenReportService{}),
 		RBACHandler:                      handler.NewRBACHandler(&contractRBACService{}),
 		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
@@ -277,6 +286,7 @@ func newContractRouter() *gin.Engine {
 		ReviewLogHandler:                 handler.NewReviewLogHandler(&contractReviewLogService{}),
 		AnalysisLogHandler:               handler.NewAnalysisExecutionLogHandler(&contractAnalysisExecutionLogService{}),
 		AIReviewTraceHandler:             handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
+		IMRobotHandler:                   handler.NewIMRobotHandler(&contractIMRobotService{}),
 		OpenReportHandler:                handler.NewOpenReportHandler(&contractOpenReportService{}),
 		RBACHandler:                      handler.NewRBACHandler(&contractRBACService{}),
 		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
@@ -500,6 +510,32 @@ func (s *contractLLMModelService) SetDefault(ctx context.Context, id uint) error
 
 func (s *contractLLMModelService) TestConnection(ctx context.Context, input service.LLMConnectionInput) error {
 	return service.ErrInvalidLLMModelInput
+}
+
+type contractIMRobotService struct{}
+
+func (s *contractIMRobotService) Create(ctx context.Context, input service.IMRobotInput) (*service.IMRobot, error) {
+	return nil, service.ErrInvalidIMRobotInput
+}
+
+func (s *contractIMRobotService) Update(ctx context.Context, id uint, input service.IMRobotInput) (*service.IMRobot, error) {
+	return nil, service.ErrInvalidIMRobotInput
+}
+
+func (s *contractIMRobotService) Get(ctx context.Context, id uint) (*service.IMRobot, error) {
+	return nil, service.ErrInvalidIMRobotInput
+}
+
+func (s *contractIMRobotService) Delete(ctx context.Context, ids []uint) error {
+	return service.ErrInvalidIMRobotInput
+}
+
+func (s *contractIMRobotService) Search(ctx context.Context, query service.IMRobotSearchQuery) (*service.IMRobotPage, error) {
+	return &service.IMRobotPage{Items: []service.IMRobot{}, Total: 0, Page: 1, Size: 20}, nil
+}
+
+func (s *contractIMRobotService) ListEnabled(ctx context.Context) ([]service.IMRobot, error) {
+	return []service.IMRobot{}, nil
 }
 
 type contractReviewLogService struct{}

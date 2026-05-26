@@ -67,6 +67,7 @@ func main() {
 	aiReviewTraceSvc := service.NewAIReviewTraceService(repository.NewAIReviewTraceRepository(db))
 	openReportSvc := service.NewOpenReportService(repository.NewReviewLogRepository(db))
 	llmModelSvc := service.NewLLMModelService(repository.NewLLMModelRepository(db), llm.NewOpenAICompatibleChecker(nil))
+	imRobotSvc := service.NewIMRobotService(repository.NewIMRobotRepository(db))
 	rbacSvc := service.NewRBACService(repository.NewUserRepository(db))
 	workerCtx, stopWorker := context.WithCancel(context.Background())
 	var workerRunner *worker.Runner
@@ -113,6 +114,7 @@ func main() {
 	reviewLogHandler := handler.NewReviewLogHandler(reviewLogSvc)
 	analysisLogHandler := handler.NewAnalysisExecutionLogHandler(analysisLogSvc)
 	aiReviewTraceHandler := handler.NewAIReviewTraceHandler(aiReviewTraceSvc)
+	imRobotHandler := handler.NewIMRobotHandler(imRobotSvc)
 	openReportHandler := handler.NewOpenReportHandler(openReportSvc)
 	webhookHandler := handler.NewWebhookHandler(reviewTaskSvc)
 	rbacHandler := handler.NewRBACHandler(rbacSvc)
@@ -127,6 +129,7 @@ func main() {
 		ReviewLogHandler:                 reviewLogHandler,
 		AnalysisLogHandler:               analysisLogHandler,
 		AIReviewTraceHandler:             aiReviewTraceHandler,
+		IMRobotHandler:                   imRobotHandler,
 		OpenReportHandler:                openReportHandler,
 		WebhookHandler:                   webhookHandler,
 		RBACHandler:                      rbacHandler,

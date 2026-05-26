@@ -25,6 +25,7 @@ type Dependencies struct {
 	ReviewLogHandler                 *handler.ReviewLogHandler
 	AnalysisLogHandler               *handler.AnalysisExecutionLogHandler
 	AIReviewTraceHandler             *handler.AIReviewTraceHandler
+	IMRobotHandler                   *handler.IMRobotHandler
 	OpenReportHandler                *handler.OpenReportHandler
 	WebhookHandler                   *handler.WebhookHandler
 	RBACHandler                      *handler.RBACHandler
@@ -69,14 +70,9 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 	registerReviewLogRoutes(admin, deps.ReviewLogHandler)
 	registerAnalysisExecutionLogRoutes(admin, deps.AnalysisLogHandler)
 	registerAIReviewTraceRoutes(admin, deps.AIReviewTraceHandler)
+	registerIMRobotRoutes(admin, deps.IMRobotHandler)
 	registerRBACRoutes(admin, deps.RBACHandler)
 	registerRoutes(admin, []routeDef{
-		{http.MethodPost, "/im-robot/create", "im-robot:write"},
-		{http.MethodPost, "/im-robot/update", "im-robot:write"},
-		{http.MethodGet, "/im-robot/get", "im-robot:read"},
-		{http.MethodPost, "/im-robot/delete", "im-robot:write"},
-		{http.MethodGet, "/im-robot/search", "im-robot:read"},
-		{http.MethodGet, "/im-robot/list-enabled", "im-robot:read"},
 		{http.MethodPost, "/im-robot/test-webhook", "im-robot:write"},
 
 		{http.MethodPost, "/member-im-mapping/create", "member-im-mapping:write"},
@@ -105,6 +101,15 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 		{http.MethodGet, "/system/config", "system:read"},
 		{http.MethodPost, "/system/config/base-url", "system:write"},
 	})
+}
+
+func registerIMRobotRoutes(group *gin.RouterGroup, imRobotHandler *handler.IMRobotHandler) {
+	group.POST("/im-robot/create", middleware.RequirePermission("im-robot:write"), imRobotHandler.Create)
+	group.POST("/im-robot/update", middleware.RequirePermission("im-robot:write"), imRobotHandler.Update)
+	group.GET("/im-robot/get", middleware.RequirePermission("im-robot:read"), imRobotHandler.Get)
+	group.POST("/im-robot/delete", middleware.RequirePermission("im-robot:write"), imRobotHandler.Delete)
+	group.GET("/im-robot/search", middleware.RequirePermission("im-robot:read"), imRobotHandler.Search)
+	group.GET("/im-robot/list-enabled", middleware.RequirePermission("im-robot:read"), imRobotHandler.ListEnabled)
 }
 
 func registerProjectTemplateRoutes(group *gin.RouterGroup, templateHandler *handler.ProjectTemplateHandler) {
