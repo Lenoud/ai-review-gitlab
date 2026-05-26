@@ -30,10 +30,11 @@ func TestReviewWorkerProcessNextHandlesPushTask(t *testing.T) {
 	}
 	projects := &fakeWorkerProjectRepo{
 		project: &Project{
-			ID:          7,
-			Name:        "repo",
-			WebURL:      "https://gitlab.example.com/group/repo",
-			AccessToken: "project-token",
+			ID:                   7,
+			Name:                 "repo",
+			WebURL:               "https://gitlab.example.com/group/repo",
+			AccessToken:          "project-token",
+			ReviewPromptTemplate: "项目 {{projectName}} 请检查。",
 		},
 	}
 	models := &fakeWorkerLLMModelRepo{
@@ -66,6 +67,9 @@ func TestReviewWorkerProcessNextHandlesPushTask(t *testing.T) {
 	require.Equal(t, 123, gitlab.lastCommitProjectID)
 	require.Equal(t, "abc123", gitlab.lastCommitSHA)
 	require.Contains(t, llm.lastPrompt, "@@ diff")
+	require.Contains(t, llm.lastPrompt, "项目 repo 请检查。")
+	require.Contains(t, llm.lastPrompt, "### 待审查内容")
+	require.Contains(t, llm.lastPrompt, "fix auth (by Alice);")
 	require.Equal(t, "gpt-test", llm.lastInput.ModelCode)
 	require.True(t, tasks.started)
 	require.True(t, tasks.succeeded)

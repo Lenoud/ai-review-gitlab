@@ -132,7 +132,7 @@ func (s *ReviewWorkerService) processClaimedTask(ctx context.Context, task *Revi
 	}
 	messages := []LLMChatMessage{
 		{Role: "system", Content: "你是一个严谨的代码审查助手。请基于 diff 给出问题、风险和建议。"},
-		{Role: "user", Content: buildReviewPrompt(project, task, diff)},
+		{Role: "user", Content: buildReviewPrompt(project, payload, diff)},
 	}
 	reviewText, err := s.llm.Chat(ctx, LLMChatInput{
 		APIBaseURL: model.APIBaseURL,
@@ -366,16 +366,21 @@ func gitLabBaseURL(webURL string) (string, error) {
 	return parsed.Scheme + "://" + parsed.Host, nil
 }
 
-func buildReviewPrompt(project *Project, task *ReviewTask, diff []GitLabDiff) string {
-	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("项目: %s\n", project.Name))
-	builder.WriteString(fmt.Sprintf("事件: %s\n", task.EventType))
-	if strings.TrimSpace(project.ReviewPromptTemplate) != "" {
-		builder.WriteString("项目审查要求:\n")
-		builder.WriteString(project.ReviewPromptTemplate)
-		builder.WriteString("\n")
+func buildReviewPrompt(project *Project, payload *reviewWorkerPayload, diff []GitLabDiff) string {
+	template := strings.TrimSpace(project.ReviewPromptTemplate)
+	if template == "" {
+		template = defaultReviewPromptTemplate
 	}
-	builder.WriteString("代码 diff:\n")
+	return AssembleReviewPrompt(ReviewPromptAssembleInput{
+		Template:    template,
+		Diffs:       renderGitLabDiffs(diff),
+		Commits:     payload.CommitMessages,
+		ProjectName: project.Name,
+	})
+}
+
+func renderGitLabDiffs(diff []GitLabDiff) string {
+	var builder strings.Builder
 	for _, item := range diff {
 		path := item.NewPath
 		if path == "" {

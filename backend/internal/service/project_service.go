@@ -32,8 +32,6 @@ const (
 
 #### 二、评分明细
 - 按五个评分维度分别给出具体分数，并简要说明理由。`
-
-	reviewScoreFormatInstruction = "\n\n### 输出要求（必须遵守）\n请在回答末尾给出总分，格式严格为：总分:XX分（例如：总分:85分），以便系统解析。\n"
 )
 
 var (
@@ -357,23 +355,18 @@ func (s *ProjectService) TestReviewPrompt(ctx context.Context, input ReviewPromp
 	if strings.TrimSpace(commits) == "" {
 		commits = "[示例提交历史]"
 	}
-	rendered := assembleReviewPrompt(input.PromptTemplate, diffs, commits, projectName)
+	rendered := AssembleReviewPrompt(ReviewPromptAssembleInput{
+		Template:    input.PromptTemplate,
+		Diffs:       diffs,
+		Commits:     commits,
+		ProjectName: projectName,
+	})
 	return &ReviewPromptTestResult{
 		RenderedPrompt:       rendered,
 		CharacterCount:       len(rendered),
 		HasRequiredVariables: true,
 		MissingVariables:     "",
 	}, nil
-}
-
-func assembleReviewPrompt(template string, diffs string, commits string, projectName string) string {
-	replacer := strings.NewReplacer(
-		"{{projectName}}", projectName,
-		"{{diffs}}", "",
-		"{{commits}}", "",
-	)
-	fixedPart := replacer.Replace(template) + reviewScoreFormatInstruction
-	return fixedPart + "\n\n### 待审查内容\n**代码变更内容**：\n" + diffs + "\n\n**提交历史（commits）**：\n" + commits
 }
 
 func normalizeProjectInput(input ProjectInput) (ProjectInput, error) {
