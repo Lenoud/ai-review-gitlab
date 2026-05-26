@@ -144,6 +144,7 @@ func (s *ReviewWorkerService) processClaimedTask(ctx context.Context, task *Revi
 	if err != nil {
 		return "", err
 	}
+	reviewText = CleanReviewOutput(reviewText)
 	if s.logs != nil {
 		eventType, eventID, err := s.createReviewLog(ctx, task, project, payload, diff, reviewText)
 		if err != nil {

@@ -51,7 +51,7 @@ func TestReviewWorkerProcessNextHandlesPushTask(t *testing.T) {
 	gitlab := &fakeWorkerGitLabClient{
 		commitDiff: []GitLabDiff{{OldPath: "main.go", NewPath: "main.go", Diff: "@@ diff"}},
 	}
-	llm := &fakeWorkerLLMClient{response: "review ok"}
+	llm := &fakeWorkerLLMClient{response: "<think>hidden reasoning</think>\n\nreview ok"}
 	logs := &fakeWorkerReviewLogWriter{}
 	traces := &fakeWorkerTraceWriter{}
 	worker := NewReviewWorkerService(tasks, projects, models, gitlab, llm, logs, traces)
