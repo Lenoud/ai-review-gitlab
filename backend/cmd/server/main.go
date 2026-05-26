@@ -70,6 +70,7 @@ func main() {
 	imRobotSvc := service.NewIMRobotService(repository.NewIMRobotRepository(db))
 	memberIMMappingSvc := service.NewMemberIMMappingService(repository.NewMemberIMMappingRepository(db))
 	rbacSvc := service.NewRBACService(repository.NewUserRepository(db))
+	systemSvc := service.NewSystemService(repository.NewSettingRepository(db))
 	workerCtx, stopWorker := context.WithCancel(context.Background())
 	var workerRunner *worker.Runner
 	if cfg.Worker.Enabled {
@@ -120,6 +121,7 @@ func main() {
 	openReportHandler := handler.NewOpenReportHandler(openReportSvc)
 	webhookHandler := handler.NewWebhookHandler(reviewTaskSvc)
 	rbacHandler := handler.NewRBACHandler(rbacSvc)
+	systemHandler := handler.NewSystemHandler(systemSvc)
 	r := router.New(router.Dependencies{
 		AuthHandler:                      authHandler,
 		ProjectHandler:                   projectHandler,
@@ -133,6 +135,7 @@ func main() {
 		AIReviewTraceHandler:             aiReviewTraceHandler,
 		IMRobotHandler:                   imRobotHandler,
 		MemberIMMappingHandler:           memberIMMappingHandler,
+		SystemHandler:                    systemHandler,
 		OpenReportHandler:                openReportHandler,
 		WebhookHandler:                   webhookHandler,
 		RBACHandler:                      rbacHandler,

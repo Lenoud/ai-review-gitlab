@@ -27,6 +27,7 @@ type Dependencies struct {
 	AIReviewTraceHandler             *handler.AIReviewTraceHandler
 	IMRobotHandler                   *handler.IMRobotHandler
 	MemberIMMappingHandler           *handler.MemberIMMappingHandler
+	SystemHandler                    *handler.SystemHandler
 	OpenReportHandler                *handler.OpenReportHandler
 	WebhookHandler                   *handler.WebhookHandler
 	RBACHandler                      *handler.RBACHandler
@@ -50,7 +51,7 @@ func registerPublicRoutes(r *gin.Engine, deps Dependencies) {
 		open.POST("/auth/login", deps.AuthHandler.Login)
 		open.POST("/auth/refresh", deps.AuthHandler.Refresh)
 		open.POST("/auth/logout", deps.AuthHandler.Logout)
-		open.GET("/system/info", handler.SystemInfo)
+		open.GET("/system/info", deps.SystemHandler.OpenInfo)
 		open.GET("/code-review-report", deps.OpenReportHandler.CodeReviewReport)
 		open.GET("/analysis-report", deps.OpenReportHandler.AnalysisReport)
 	}
@@ -74,6 +75,7 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 	registerIMRobotRoutes(admin, deps.IMRobotHandler)
 	registerMemberIMMappingRoutes(admin, deps.MemberIMMappingHandler)
 	registerRBACRoutes(admin, deps.RBACHandler)
+	registerSystemRoutes(admin, deps.SystemHandler)
 	registerRoutes(admin, []routeDef{
 		{http.MethodPost, "/im-robot/test-webhook", "im-robot:write"},
 
@@ -83,10 +85,13 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 		{http.MethodGet, "/member/commit-summary", "stats:read"},
 		{http.MethodGet, "/sys-log/get", "sys-log:read"},
 		{http.MethodGet, "/sys-log/search", "sys-log:read"},
-		{http.MethodGet, "/system/info", "system:read"},
-		{http.MethodGet, "/system/config", "system:read"},
-		{http.MethodPost, "/system/config/base-url", "system:write"},
 	})
+}
+
+func registerSystemRoutes(group *gin.RouterGroup, systemHandler *handler.SystemHandler) {
+	group.GET("/system/info", middleware.RequirePermission("system:read"), systemHandler.Info)
+	group.GET("/system/config", middleware.RequirePermission("system:read"), systemHandler.Config)
+	group.POST("/system/config/base-url", middleware.RequirePermission("system:write"), systemHandler.UpdateBaseURL)
 }
 
 func registerMemberIMMappingRoutes(group *gin.RouterGroup, mappingHandler *handler.MemberIMMappingHandler) {

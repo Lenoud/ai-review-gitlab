@@ -255,6 +255,11 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 			"/api/v1/admin/project-template/review-rule/list-by-template-id",
 			"/api/v1/admin/project-template/review-rule/delete":
 			expectedStatus = http.StatusBadRequest
+		case "/api/v1/admin/system/info",
+			"/api/v1/admin/system/config":
+			expectedStatus = http.StatusOK
+		case "/api/v1/admin/system/config/base-url":
+			expectedStatus = http.StatusBadRequest
 		}
 		require.Equal(t, expectedStatus, w.Code, "%s %s with token", route.method, route.path)
 	}
@@ -275,7 +280,9 @@ func TestAdminProtectedRoutesReturnForbiddenWithoutPermission(t *testing.T) {
 		AIReviewTraceHandler:             handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
 		IMRobotHandler:                   handler.NewIMRobotHandler(&contractIMRobotService{}),
 		MemberIMMappingHandler:           handler.NewMemberIMMappingHandler(&contractMemberIMMappingService{}),
+		SystemHandler:                    handler.NewSystemHandler(&contractSystemService{}),
 		OpenReportHandler:                handler.NewOpenReportHandler(&contractOpenReportService{}),
+		WebhookHandler:                   handler.NewWebhookHandler(&contractReviewTaskService{}),
 		RBACHandler:                      handler.NewRBACHandler(&contractRBACService{}),
 		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
 			subject: &service.AuthSubject{
@@ -308,7 +315,9 @@ func newContractRouter() *gin.Engine {
 		AIReviewTraceHandler:             handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
 		IMRobotHandler:                   handler.NewIMRobotHandler(&contractIMRobotService{}),
 		MemberIMMappingHandler:           handler.NewMemberIMMappingHandler(&contractMemberIMMappingService{}),
+		SystemHandler:                    handler.NewSystemHandler(&contractSystemService{}),
 		OpenReportHandler:                handler.NewOpenReportHandler(&contractOpenReportService{}),
+		WebhookHandler:                   handler.NewWebhookHandler(&contractReviewTaskService{}),
 		RBACHandler:                      handler.NewRBACHandler(&contractRBACService{}),
 		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
 			subject: &service.AuthSubject{
@@ -615,6 +624,22 @@ func (s *contractMemberIMMappingService) Delete(ctx context.Context, ids []uint)
 
 func (s *contractMemberIMMappingService) Search(ctx context.Context, query service.MemberIMMappingSearchQuery) (*service.MemberIMMappingPage, error) {
 	return &service.MemberIMMappingPage{Items: []service.MemberIMMapping{}, Total: 0, Page: 1, Size: 20}, nil
+}
+
+type contractSystemService struct{}
+
+func (s *contractSystemService) GetConfig(ctx context.Context) (*service.SystemConfig, error) {
+	return &service.SystemConfig{Version: "1.0.0", SiteName: "AI Code Review", SiteNotice: ""}, nil
+}
+
+func (s *contractSystemService) UpdateBaseURL(ctx context.Context, baseURL string) (*service.SystemConfig, error) {
+	return nil, service.ErrInvalidSystemConfigInput
+}
+
+type contractReviewTaskService struct{}
+
+func (s *contractReviewTaskService) EnqueueGitLabWebhook(ctx context.Context, input service.GitLabWebhookInput) (*service.ReviewTaskEnqueueResult, error) {
+	return nil, service.ErrInvalidReviewTaskInput
 }
 
 type contractReviewLogService struct{}
