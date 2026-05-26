@@ -57,6 +57,7 @@ func main() {
 	}
 
 	projectSvc := service.NewProjectService(repository.NewProjectRepository(db))
+	analysisPlanSvc := service.NewProjectAnalysisPlanService(repository.NewProjectAnalysisPlanRepository(db))
 	gitLabSvc := service.NewGitLabService(platformgitlab.NewServiceAdapter(nil))
 	reviewTaskSvc := service.NewReviewTaskService(repository.NewProjectRepository(db), repository.NewReviewTaskRepository(db), service.ReviewTaskOptions{})
 	reviewLogSvc := service.NewReviewLogService(repository.NewReviewLogRepository(db))
@@ -102,6 +103,7 @@ func main() {
 	}()
 	authHandler := handler.NewAuthHandler(authSvc)
 	projectHandler := handler.NewProjectHandler(projectSvc)
+	analysisPlanHandler := handler.NewProjectAnalysisPlanHandler(analysisPlanSvc)
 	projectGitLabHandler := handler.NewProjectGitLabHandler(gitLabSvc)
 	llmModelHandler := handler.NewLLMModelHandler(llmModelSvc)
 	reviewLogHandler := handler.NewReviewLogHandler(reviewLogSvc)
@@ -114,6 +116,7 @@ func main() {
 		AuthHandler:          authHandler,
 		ProjectHandler:       projectHandler,
 		ProjectGitLabHandler: projectGitLabHandler,
+		AnalysisPlanHandler:  analysisPlanHandler,
 		LLMModelHandler:      llmModelHandler,
 		ReviewLogHandler:     reviewLogHandler,
 		AnalysisLogHandler:   analysisLogHandler,

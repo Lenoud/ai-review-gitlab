@@ -18,6 +18,7 @@ type Dependencies struct {
 	AuthHandler          *handler.AuthHandler
 	ProjectHandler       *handler.ProjectHandler
 	ProjectGitLabHandler *handler.ProjectGitLabHandler
+	AnalysisPlanHandler  *handler.ProjectAnalysisPlanHandler
 	LLMModelHandler      *handler.LLMModelHandler
 	ReviewLogHandler     *handler.ReviewLogHandler
 	AnalysisLogHandler   *handler.AnalysisExecutionLogHandler
@@ -59,6 +60,7 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 	admin.GET("/auth/me", deps.AuthHandler.Me)
 	registerProjectRoutes(admin, deps.ProjectHandler)
 	registerProjectGitLabRoutes(admin, deps.ProjectGitLabHandler)
+	registerProjectAnalysisPlanRoutes(admin, deps.AnalysisPlanHandler)
 	registerLLMModelRoutes(admin, deps.LLMModelHandler)
 	registerReviewLogRoutes(admin, deps.ReviewLogHandler)
 	registerAnalysisExecutionLogRoutes(admin, deps.AnalysisLogHandler)
@@ -90,11 +92,6 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 		{http.MethodGet, "/project-template/review-rule/get", "project-template:read"},
 		{http.MethodPost, "/project-template/review-rule/delete", "project-template:write"},
 
-		{http.MethodPost, "/project-analysis-plan/create", "project-analysis-plan:write"},
-		{http.MethodPost, "/project-analysis-plan/update", "project-analysis-plan:write"},
-		{http.MethodGet, "/project-analysis-plan/get", "project-analysis-plan:read"},
-		{http.MethodPost, "/project-analysis-plan/delete", "project-analysis-plan:write"},
-		{http.MethodGet, "/project-analysis-plan/search", "project-analysis-plan:read"},
 		{http.MethodPost, "/project-analysis-plan-execution-log/test-run", "project-analysis-plan:write"},
 
 		{http.MethodPost, "/user/create", "rbac:write"},
@@ -115,6 +112,14 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 		{http.MethodGet, "/system/config", "system:read"},
 		{http.MethodPost, "/system/config/base-url", "system:write"},
 	})
+}
+
+func registerProjectAnalysisPlanRoutes(group *gin.RouterGroup, analysisPlanHandler *handler.ProjectAnalysisPlanHandler) {
+	group.POST("/project-analysis-plan/create", middleware.RequirePermission("project-analysis-plan:write"), analysisPlanHandler.Create)
+	group.POST("/project-analysis-plan/update", middleware.RequirePermission("project-analysis-plan:write"), analysisPlanHandler.Update)
+	group.GET("/project-analysis-plan/get", middleware.RequirePermission("project-analysis-plan:read"), analysisPlanHandler.Get)
+	group.POST("/project-analysis-plan/delete", middleware.RequirePermission("project-analysis-plan:write"), analysisPlanHandler.Delete)
+	group.GET("/project-analysis-plan/search", middleware.RequirePermission("project-analysis-plan:read"), analysisPlanHandler.Search)
 }
 
 func registerAnalysisExecutionLogRoutes(group *gin.RouterGroup, analysisLogHandler *handler.AnalysisExecutionLogHandler) {

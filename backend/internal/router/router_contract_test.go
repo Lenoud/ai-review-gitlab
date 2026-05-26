@@ -208,6 +208,13 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 			expectedStatus = http.StatusOK
 		case "/api/v1/admin/project-analysis-plan-execution-log/generate-share-token/1":
 			expectedStatus = http.StatusNotFound
+		case "/api/v1/admin/project-analysis-plan/create",
+			"/api/v1/admin/project-analysis-plan/update",
+			"/api/v1/admin/project-analysis-plan/get",
+			"/api/v1/admin/project-analysis-plan/delete":
+			expectedStatus = http.StatusBadRequest
+		case "/api/v1/admin/project-analysis-plan/search":
+			expectedStatus = http.StatusOK
 		}
 		require.Equal(t, expectedStatus, w.Code, "%s %s with token", route.method, route.path)
 	}
@@ -219,6 +226,7 @@ func TestAdminProtectedRoutesReturnForbiddenWithoutPermission(t *testing.T) {
 		AuthHandler:          NewAuthHandlerForTest(),
 		ProjectHandler:       handler.NewProjectHandler(&contractProjectService{}),
 		ProjectGitLabHandler: handler.NewProjectGitLabHandler(&contractProjectGitLabService{}),
+		AnalysisPlanHandler:  handler.NewProjectAnalysisPlanHandler(&contractProjectAnalysisPlanService{}),
 		LLMModelHandler:      handler.NewLLMModelHandler(&contractLLMModelService{}),
 		ReviewLogHandler:     handler.NewReviewLogHandler(&contractReviewLogService{}),
 		AnalysisLogHandler:   handler.NewAnalysisExecutionLogHandler(&contractAnalysisExecutionLogService{}),
@@ -247,6 +255,7 @@ func newContractRouter() *gin.Engine {
 		AuthHandler:          NewAuthHandlerForTest(),
 		ProjectHandler:       handler.NewProjectHandler(&contractProjectService{}),
 		ProjectGitLabHandler: handler.NewProjectGitLabHandler(&contractProjectGitLabService{}),
+		AnalysisPlanHandler:  handler.NewProjectAnalysisPlanHandler(&contractProjectAnalysisPlanService{}),
 		LLMModelHandler:      handler.NewLLMModelHandler(&contractLLMModelService{}),
 		ReviewLogHandler:     handler.NewReviewLogHandler(&contractReviewLogService{}),
 		AnalysisLogHandler:   handler.NewAnalysisExecutionLogHandler(&contractAnalysisExecutionLogService{}),
@@ -369,6 +378,33 @@ func (s *contractProjectGitLabService) SearchProjects(ctx context.Context, input
 
 func (s *contractProjectGitLabService) SearchGroups(ctx context.Context, input service.GitLabSearchInput) ([]service.GitLabGroup, error) {
 	return nil, service.ErrInvalidGitLabInput
+}
+
+type contractProjectAnalysisPlanService struct{}
+
+func (s *contractProjectAnalysisPlanService) Create(ctx context.Context, input service.ProjectAnalysisPlanInput) (*service.ProjectAnalysisPlan, error) {
+	return nil, service.ErrInvalidProjectAnalysisPlanInput
+}
+
+func (s *contractProjectAnalysisPlanService) Update(ctx context.Context, id uint, input service.ProjectAnalysisPlanInput) (*service.ProjectAnalysisPlan, error) {
+	return nil, service.ErrInvalidProjectAnalysisPlanInput
+}
+
+func (s *contractProjectAnalysisPlanService) Get(ctx context.Context, id uint) (*service.ProjectAnalysisPlan, error) {
+	return nil, service.ErrInvalidProjectAnalysisPlanInput
+}
+
+func (s *contractProjectAnalysisPlanService) Delete(ctx context.Context, ids []uint) error {
+	return service.ErrInvalidProjectAnalysisPlanInput
+}
+
+func (s *contractProjectAnalysisPlanService) Search(ctx context.Context, query service.ProjectAnalysisPlanSearchQuery) (*service.ProjectAnalysisPlanPage, error) {
+	return &service.ProjectAnalysisPlanPage{
+		Items: []service.ProjectAnalysisPlan{},
+		Total: 0,
+		Page:  1,
+		Size:  20,
+	}, nil
 }
 
 type contractLLMModelService struct{}
