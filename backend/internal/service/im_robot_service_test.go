@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -84,6 +85,21 @@ func TestIMRobotServiceRejectsUnsafeWebhookURL(t *testing.T) {
 
 			require.ErrorIs(t, err, ErrInvalidIMRobotInput)
 		})
+	}
+}
+
+func TestIMRobotServiceRejectsOverlongInput(t *testing.T) {
+	svc := NewIMRobotService(&fakeIMRobotRepository{})
+
+	tests := []IMRobotInput{
+		{Platform: IMRobotPlatformDingTalk, Name: strings.Repeat("n", 129), WebhookURL: "https://example.com/webhook"},
+		{Platform: IMRobotPlatformDingTalk, Name: "alerts", WebhookURL: "https://example.com/" + strings.Repeat("w", 1005)},
+		{Platform: IMRobotPlatformDingTalk, Name: "alerts", WebhookURL: "https://example.com/webhook", Secret: strings.Repeat("s", 513)},
+	}
+
+	for _, input := range tests {
+		_, err := svc.Create(context.Background(), input)
+		require.ErrorIs(t, err, ErrInvalidIMRobotInput)
 	}
 }
 

@@ -11,6 +11,11 @@ const (
 	IMRobotPlatformDingTalk = "dingtalk"
 	IMRobotPlatformFeishu   = "feishu"
 	IMRobotPlatformWeCom    = "wecom"
+
+	imRobotPlatformMaxLength   = 32
+	imRobotNameMaxLength       = 128
+	imRobotWebhookURLMaxLength = 1024
+	imRobotSecretMaxLength     = 512
 )
 
 var (
@@ -149,6 +154,12 @@ func normalizeIMRobotInput(input IMRobotInput) (IMRobotInput, error) {
 	input.WebhookURL = strings.TrimSpace(input.WebhookURL)
 	input.Secret = strings.TrimSpace(input.Secret)
 	if input.Platform == "" || input.Name == "" || input.WebhookURL == "" {
+		return IMRobotInput{}, ErrInvalidIMRobotInput
+	}
+	if len(input.Platform) > imRobotPlatformMaxLength ||
+		len(input.Name) > imRobotNameMaxLength ||
+		len(input.WebhookURL) > imRobotWebhookURLMaxLength ||
+		len(input.Secret) > imRobotSecretMaxLength {
 		return IMRobotInput{}, ErrInvalidIMRobotInput
 	}
 	if !isSupportedIMRobotPlatform(input.Platform) {

@@ -6,6 +6,13 @@ import (
 	"strings"
 )
 
+const (
+	memberIMMappingGitUsernameMaxLength = 128
+	memberIMMappingPlatformMaxLength    = 32
+	memberIMMappingIMUserIDMaxLength    = 256
+	memberIMMappingDisplayNameMaxLength = 128
+)
+
 var (
 	ErrMemberIMMappingNotFound     = errors.New("member im mapping not found")
 	ErrInvalidMemberIMMappingInput = errors.New("invalid member im mapping input")
@@ -140,6 +147,12 @@ func normalizeMemberIMMappingInput(input MemberIMMappingInput) (MemberIMMappingI
 	input.IMUserID = strings.TrimSpace(input.IMUserID)
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	if input.GitUsername == "" || input.Platform == "" || input.IMUserID == "" {
+		return MemberIMMappingInput{}, ErrInvalidMemberIMMappingInput
+	}
+	if len(input.GitUsername) > memberIMMappingGitUsernameMaxLength ||
+		len(input.Platform) > memberIMMappingPlatformMaxLength ||
+		len(input.IMUserID) > memberIMMappingIMUserIDMaxLength ||
+		len(input.DisplayName) > memberIMMappingDisplayNameMaxLength {
 		return MemberIMMappingInput{}, ErrInvalidMemberIMMappingInput
 	}
 	if !isSupportedIMRobotPlatform(input.Platform) {

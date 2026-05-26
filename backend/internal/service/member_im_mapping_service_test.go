@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -63,6 +64,21 @@ func TestMemberIMMappingServiceRejectsInvalidInput(t *testing.T) {
 		{GitUsername: "alice", IMUserID: "ding-user"},
 		{GitUsername: "alice", Platform: "slack", IMUserID: "slack-user"},
 		{GitUsername: "alice", Platform: IMRobotPlatformDingTalk},
+	}
+
+	for _, input := range tests {
+		_, err := svc.Create(context.Background(), input)
+		require.ErrorIs(t, err, ErrInvalidMemberIMMappingInput)
+	}
+}
+
+func TestMemberIMMappingServiceRejectsOverlongInput(t *testing.T) {
+	svc := NewMemberIMMappingService(&fakeMemberIMMappingRepository{})
+
+	tests := []MemberIMMappingInput{
+		{GitUsername: strings.Repeat("a", 129), Platform: IMRobotPlatformDingTalk, IMUserID: "ding-user"},
+		{GitUsername: "alice", Platform: IMRobotPlatformDingTalk, IMUserID: strings.Repeat("u", 257)},
+		{GitUsername: "alice", Platform: IMRobotPlatformDingTalk, IMUserID: "ding-user", DisplayName: strings.Repeat("d", 129)},
 	}
 
 	for _, input := range tests {
