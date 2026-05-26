@@ -1,10 +1,16 @@
 package service
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -59,6 +65,16 @@ type IMRobotPage struct {
 	Size  int       `json:"size"`
 }
 
+type IMRobotTestWebhookInput struct {
+	Platform   string
+	WebhookURL string
+}
+
+type IMRobotTestWebhookResult struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
 type IMRobotRepository interface {
 	CreateIMRobot(ctx context.Context, input IMRobotInput) (*IMRobot, error)
 	UpdateIMRobot(ctx context.Context, id uint, input IMRobotInput) (*IMRobot, error)
@@ -69,12 +85,24 @@ type IMRobotRepository interface {
 	CountIMRobotReferences(ctx context.Context, ids []uint) (int64, error)
 }
 
+type IMRobotWebhookSender interface {
+	SendIMRobotWebhook(ctx context.Context, webhookURL string, payload []byte) ([]byte, error)
+}
+
 type IMRobotService struct {
-	robots IMRobotRepository
+	robots        IMRobotRepository
+	webhookSender IMRobotWebhookSender
 }
 
 func NewIMRobotService(robots IMRobotRepository) *IMRobotService {
-	return &IMRobotService{robots: robots}
+	return NewIMRobotServiceWithSender(robots, newHTTPIMRobotWebhookSender(nil))
+}
+
+func NewIMRobotServiceWithSender(robots IMRobotRepository, webhookSender IMRobotWebhookSender) *IMRobotService {
+	if webhookSender == nil {
+		webhookSender = newHTTPIMRobotWebhookSender(nil)
+	}
+	return &IMRobotService{robots: robots, webhookSender: webhookSender}
 }
 
 func (s *IMRobotService) Create(ctx context.Context, input IMRobotInput) (*IMRobot, error) {
@@ -148,6 +176,22 @@ func (s *IMRobotService) ListEnabled(ctx context.Context) ([]IMRobot, error) {
 	return s.robots.ListEnabledIMRobots(ctx)
 }
 
+func (s *IMRobotService) TestWebhook(ctx context.Context, input IMRobotTestWebhookInput) (*IMRobotTestWebhookResult, error) {
+	normalized, err := normalizeIMRobotTestWebhookInput(input)
+	if err != nil {
+		return nil, err
+	}
+	payload, err := buildIMRobotTestWebhookPayload(normalized.Platform)
+	if err != nil {
+		return nil, err
+	}
+	body, err := s.webhookSender.SendIMRobotWebhook(ctx, normalized.WebhookURL, payload)
+	if err != nil {
+		return &IMRobotTestWebhookResult{Success: false, Message: "请求异常: " + err.Error()}, nil
+	}
+	return parseIMRobotWebhookResponse(body), nil
+}
+
 func normalizeIMRobotInput(input IMRobotInput) (IMRobotInput, error) {
 	input.Platform = strings.TrimSpace(input.Platform)
 	input.Name = strings.TrimSpace(input.Name)
@@ -176,6 +220,99 @@ func normalizeIMRobotInput(input IMRobotInput) (IMRobotInput, error) {
 	return input, nil
 }
 
+func normalizeIMRobotTestWebhookInput(input IMRobotTestWebhookInput) (IMRobotTestWebhookInput, error) {
+	input.Platform = strings.TrimSpace(input.Platform)
+	input.WebhookURL = strings.TrimSpace(input.WebhookURL)
+	if input.Platform == "" || input.WebhookURL == "" {
+		return IMRobotTestWebhookInput{}, ErrInvalidIMRobotInput
+	}
+	if len(input.Platform) > imRobotPlatformMaxLength || len(input.WebhookURL) > imRobotWebhookURLMaxLength {
+		return IMRobotTestWebhookInput{}, ErrInvalidIMRobotInput
+	}
+	if !isSupportedIMRobotPlatform(input.Platform) {
+		return IMRobotTestWebhookInput{}, ErrInvalidIMRobotInput
+	}
+	parsed, err := url.ParseRequestURI(input.WebhookURL)
+	if err != nil || parsed.Host == "" || !isHTTPWebhookScheme(parsed.Scheme) {
+		return IMRobotTestWebhookInput{}, ErrInvalidIMRobotInput
+	}
+	return input, nil
+}
+
+func buildIMRobotTestWebhookPayload(platform string) ([]byte, error) {
+	switch platform {
+	case IMRobotPlatformDingTalk, IMRobotPlatformWeCom:
+		return []byte(`{"msgtype":"text","text":{"content":"Webhook 连接测试成功"}}`), nil
+	case IMRobotPlatformFeishu:
+		return []byte(`{"msg_type":"text","content":{"text":"Webhook 连接测试成功"}}`), nil
+	default:
+		return nil, ErrInvalidIMRobotInput
+	}
+}
+
+func parseIMRobotWebhookResponse(body []byte) *IMRobotTestWebhookResult {
+	if strings.TrimSpace(string(body)) == "" {
+		return &IMRobotTestWebhookResult{Success: false, Message: "响应为空"}
+	}
+	var root map[string]any
+	if err := json.Unmarshal(body, &root); err != nil {
+		return &IMRobotTestWebhookResult{Success: false, Message: "响应格式异常，无法解析"}
+	}
+	if code, ok := optionalWebhookInt(root, "errcode"); ok {
+		message := optionalWebhookText(root, "errmsg")
+		if code != 0 {
+			if message == "" {
+				message = "errcode=" + strconv.Itoa(code)
+			}
+			return &IMRobotTestWebhookResult{Success: false, Message: message}
+		}
+		if message == "" {
+			message = "ok"
+		}
+		return &IMRobotTestWebhookResult{Success: true, Message: message}
+	}
+	if code, ok := optionalWebhookInt(root, "code"); ok {
+		message := optionalWebhookText(root, "msg")
+		if code != 0 {
+			if message == "" {
+				message = "code=" + strconv.Itoa(code)
+			}
+			return &IMRobotTestWebhookResult{Success: false, Message: message}
+		}
+		if message == "" {
+			message = "ok"
+		}
+		return &IMRobotTestWebhookResult{Success: true, Message: message}
+	}
+	return &IMRobotTestWebhookResult{Success: false, Message: "无法识别的响应格式"}
+}
+
+func optionalWebhookInt(root map[string]any, field string) (int, bool) {
+	switch value := root[field].(type) {
+	case float64:
+		return int(value), true
+	case string:
+		parsed := 0
+		for _, ch := range value {
+			if ch < '0' || ch > '9' {
+				return 0, false
+			}
+			parsed = parsed*10 + int(ch-'0')
+		}
+		return parsed, value != ""
+	default:
+		return 0, false
+	}
+}
+
+func optionalWebhookText(root map[string]any, field string) string {
+	value, ok := root[field].(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(value)
+}
+
 func isHTTPWebhookScheme(scheme string) bool {
 	return scheme == "http" || scheme == "https"
 }
@@ -187,4 +324,29 @@ func isSupportedIMRobotPlatform(platform string) bool {
 	default:
 		return false
 	}
+}
+
+type httpIMRobotWebhookSender struct {
+	client *http.Client
+}
+
+func newHTTPIMRobotWebhookSender(client *http.Client) *httpIMRobotWebhookSender {
+	if client == nil {
+		client = &http.Client{Timeout: 10 * time.Second}
+	}
+	return &httpIMRobotWebhookSender{client: client}
+}
+
+func (s *httpIMRobotWebhookSender) SendIMRobotWebhook(ctx context.Context, webhookURL string, payload []byte) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookURL, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return io.ReadAll(resp.Body)
 }

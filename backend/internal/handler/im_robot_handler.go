@@ -18,6 +18,7 @@ type IMRobotService interface {
 	Delete(ctx context.Context, ids []uint) error
 	Search(ctx context.Context, query service.IMRobotSearchQuery) (*service.IMRobotPage, error)
 	ListEnabled(ctx context.Context) ([]service.IMRobot, error)
+	TestWebhook(ctx context.Context, input service.IMRobotTestWebhookInput) (*service.IMRobotTestWebhookResult, error)
 }
 
 type IMRobotHandler struct {
@@ -109,6 +110,23 @@ func (h *IMRobotHandler) ListEnabled(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *IMRobotHandler) TestWebhook(c *gin.Context) {
+	var req imRobotTestWebhookRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "IM机器人Webhook参数错误")
+		return
+	}
+	result, err := h.robots.TestWebhook(c.Request.Context(), service.IMRobotTestWebhookInput{
+		Platform:   req.Platform,
+		WebhookURL: req.WebhookURL,
+	})
+	if err != nil {
+		writeIMRobotError(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
 type imRobotRequest struct {
 	ID         uint   `json:"id"`
 	Platform   string `json:"platform"`
@@ -130,6 +148,11 @@ func (r imRobotRequest) toInput() service.IMRobotInput {
 		input.Enabled = *r.Enabled
 	}
 	return input
+}
+
+type imRobotTestWebhookRequest struct {
+	Platform   string `json:"platform"`
+	WebhookURL string `json:"webhookUrl"`
 }
 
 func writeIMRobotError(c *gin.Context, err error) {

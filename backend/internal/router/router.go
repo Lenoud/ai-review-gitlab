@@ -81,8 +81,6 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 	registerStatsRoutes(admin, deps.StatsHandler)
 	registerSysLogRoutes(admin, deps.SysLogHandler)
 	registerRoutes(admin, []routeDef{
-		{http.MethodPost, "/im-robot/test-webhook", "im-robot:write"},
-
 		{http.MethodPost, "/project-analysis-plan-execution-log/test-run", "project-analysis-plan:write"},
 	})
 }
@@ -118,6 +116,7 @@ func registerIMRobotRoutes(group *gin.RouterGroup, imRobotHandler *handler.IMRob
 	group.POST("/im-robot/delete", middleware.RequirePermission("im-robot:write"), imRobotHandler.Delete)
 	group.GET("/im-robot/search", middleware.RequirePermission("im-robot:read"), imRobotHandler.Search)
 	group.GET("/im-robot/list-enabled", middleware.RequirePermission("im-robot:read"), imRobotHandler.ListEnabled)
+	group.POST("/im-robot/test-webhook", middleware.RequirePermission("im-robot:write"), imRobotHandler.TestWebhook)
 }
 
 func registerProjectTemplateRoutes(group *gin.RouterGroup, templateHandler *handler.ProjectTemplateHandler) {

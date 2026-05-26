@@ -198,6 +198,88 @@ func TestIMRobotServicePropagatesNotFound(t *testing.T) {
 	require.ErrorIs(t, err, ErrIMRobotNotFound)
 }
 
+func TestIMRobotServiceTestWebhookSendsPlatformPayloadAndParsesErrcodeSuccess(t *testing.T) {
+	sender := &fakeIMRobotWebhookSender{
+		send: func(ctx context.Context, webhookURL string, payload []byte) ([]byte, error) {
+			require.Equal(t, "https://example.com/webhook", webhookURL)
+			require.JSONEq(t, `{"msgtype":"text","text":{"content":"Webhook 连接测试成功"}}`, string(payload))
+			return []byte(`{"errcode":0,"errmsg":"ok"}`), nil
+		},
+	}
+	svc := NewIMRobotServiceWithSender(&fakeIMRobotRepository{}, sender)
+
+	result, err := svc.TestWebhook(context.Background(), IMRobotTestWebhookInput{
+		Platform:   IMRobotPlatformDingTalk,
+		WebhookURL: " https://example.com/webhook ",
+	})
+
+	require.NoError(t, err)
+	require.True(t, result.Success)
+	require.Equal(t, "ok", result.Message)
+}
+
+func TestIMRobotServiceTestWebhookParsesCodeFailure(t *testing.T) {
+	sender := &fakeIMRobotWebhookSender{
+		send: func(ctx context.Context, webhookURL string, payload []byte) ([]byte, error) {
+			require.JSONEq(t, `{"msg_type":"text","content":{"text":"Webhook 连接测试成功"}}`, string(payload))
+			return []byte(`{"code":19024,"msg":"IP not allowed"}`), nil
+		},
+	}
+	svc := NewIMRobotServiceWithSender(&fakeIMRobotRepository{}, sender)
+
+	result, err := svc.TestWebhook(context.Background(), IMRobotTestWebhookInput{
+		Platform:   IMRobotPlatformFeishu,
+		WebhookURL: "https://example.com/webhook",
+	})
+
+	require.NoError(t, err)
+	require.False(t, result.Success)
+	require.Equal(t, "IP not allowed", result.Message)
+}
+
+func TestIMRobotServiceTestWebhookRejectsInvalidInput(t *testing.T) {
+	svc := NewIMRobotServiceWithSender(&fakeIMRobotRepository{}, &fakeIMRobotWebhookSender{})
+
+	_, err := svc.TestWebhook(context.Background(), IMRobotTestWebhookInput{
+		Platform:   "unsupported",
+		WebhookURL: "https://example.com/webhook",
+	})
+
+	require.ErrorIs(t, err, ErrInvalidIMRobotInput)
+}
+
+func TestIMRobotServiceTestWebhookReturnsFailureForMalformedJSONAndTransportErrors(t *testing.T) {
+	tests := []struct {
+		name       string
+		body       []byte
+		sendErr    error
+		wantPrefix string
+	}{
+		{name: "malformed json", body: []byte(`not-json`), wantPrefix: "响应格式异常"},
+		{name: "transport error", sendErr: errors.New("timeout"), wantPrefix: "请求异常: timeout"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sender := &fakeIMRobotWebhookSender{
+				send: func(ctx context.Context, webhookURL string, payload []byte) ([]byte, error) {
+					return tt.body, tt.sendErr
+				},
+			}
+			svc := NewIMRobotServiceWithSender(&fakeIMRobotRepository{}, sender)
+
+			result, err := svc.TestWebhook(context.Background(), IMRobotTestWebhookInput{
+				Platform:   IMRobotPlatformWeCom,
+				WebhookURL: "https://example.com/webhook",
+			})
+
+			require.NoError(t, err)
+			require.False(t, result.Success)
+			require.True(t, strings.HasPrefix(result.Message, tt.wantPrefix), result.Message)
+		})
+	}
+}
+
 type fakeIMRobotRepository struct {
 	create          func(context.Context, IMRobotInput) (*IMRobot, error)
 	update          func(context.Context, uint, IMRobotInput) (*IMRobot, error)
@@ -206,6 +288,17 @@ type fakeIMRobotRepository struct {
 	search          func(context.Context, IMRobotSearchQuery) (*IMRobotPage, error)
 	listEnabled     func(context.Context) ([]IMRobot, error)
 	countReferences func(context.Context, []uint) (int64, error)
+}
+
+type fakeIMRobotWebhookSender struct {
+	send func(context.Context, string, []byte) ([]byte, error)
+}
+
+func (s *fakeIMRobotWebhookSender) SendIMRobotWebhook(ctx context.Context, webhookURL string, payload []byte) ([]byte, error) {
+	if s.send == nil {
+		return nil, errors.New("unexpected send webhook")
+	}
+	return s.send(ctx, webhookURL, payload)
 }
 
 func (r *fakeIMRobotRepository) CreateIMRobot(ctx context.Context, input IMRobotInput) (*IMRobot, error) {

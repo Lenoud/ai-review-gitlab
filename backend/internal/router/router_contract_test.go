@@ -196,7 +196,8 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 		case "/api/v1/admin/im-robot/create",
 			"/api/v1/admin/im-robot/update",
 			"/api/v1/admin/im-robot/get",
-			"/api/v1/admin/im-robot/delete":
+			"/api/v1/admin/im-robot/delete",
+			"/api/v1/admin/im-robot/test-webhook":
 			expectedStatus = http.StatusBadRequest
 		case "/api/v1/admin/im-robot/search",
 			"/api/v1/admin/im-robot/list-enabled":
@@ -613,6 +614,10 @@ func (s *contractIMRobotService) Search(ctx context.Context, query service.IMRob
 
 func (s *contractIMRobotService) ListEnabled(ctx context.Context) ([]service.IMRobot, error) {
 	return []service.IMRobot{}, nil
+}
+
+func (s *contractIMRobotService) TestWebhook(ctx context.Context, input service.IMRobotTestWebhookInput) (*service.IMRobotTestWebhookResult, error) {
+	return nil, service.ErrInvalidIMRobotInput
 }
 
 type contractMemberIMMappingService struct{}

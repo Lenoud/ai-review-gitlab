@@ -41,6 +41,11 @@ func TestIMRobotHandlerCreateGetSearchListEnabledAndDelete(t *testing.T) {
 		listEnabled: func(ctx context.Context) ([]service.IMRobot, error) {
 			return []service.IMRobot{{ID: 11, Name: "alerts", Enabled: true}}, nil
 		},
+		testWebhook: func(ctx context.Context, input service.IMRobotTestWebhookInput) (*service.IMRobotTestWebhookResult, error) {
+			require.Equal(t, service.IMRobotPlatformFeishu, input.Platform)
+			require.Equal(t, "https://example.com/webhook", input.WebhookURL)
+			return &service.IMRobotTestWebhookResult{Success: true, Message: "ok"}, nil
+		},
 		delete: func(ctx context.Context, ids []uint) error {
 			require.Equal(t, []uint{11}, ids)
 			return nil
@@ -50,6 +55,7 @@ func TestIMRobotHandlerCreateGetSearchListEnabledAndDelete(t *testing.T) {
 	r.GET("/get", handler.Get)
 	r.GET("/search", handler.Search)
 	r.GET("/list-enabled", handler.ListEnabled)
+	r.POST("/test-webhook", handler.TestWebhook)
 	r.POST("/delete", handler.Delete)
 
 	w := httptest.NewRecorder()
@@ -75,6 +81,15 @@ func TestIMRobotHandlerCreateGetSearchListEnabledAndDelete(t *testing.T) {
 	req = httptest.NewRequest(http.MethodGet, "/list-enabled", nil)
 	r.ServeHTTP(w, req)
 	require.Equal(t, http.StatusOK, w.Code)
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/test-webhook", bytes.NewBufferString(`{"platform":"feishu","webhookUrl":"https://example.com/webhook"}`))
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	data = body["data"].(map[string]any)
+	require.Equal(t, true, data["success"])
+	require.Equal(t, "ok", data["message"])
 
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/delete", bytes.NewBufferString(`{"ids":[11]}`))
@@ -123,6 +138,7 @@ type fakeIMRobotService struct {
 	delete      func(context.Context, []uint) error
 	search      func(context.Context, service.IMRobotSearchQuery) (*service.IMRobotPage, error)
 	listEnabled func(context.Context) ([]service.IMRobot, error)
+	testWebhook func(context.Context, service.IMRobotTestWebhookInput) (*service.IMRobotTestWebhookResult, error)
 }
 
 func (s *fakeIMRobotService) Create(ctx context.Context, input service.IMRobotInput) (*service.IMRobot, error) {
@@ -147,4 +163,8 @@ func (s *fakeIMRobotService) Search(ctx context.Context, query service.IMRobotSe
 
 func (s *fakeIMRobotService) ListEnabled(ctx context.Context) ([]service.IMRobot, error) {
 	return s.listEnabled(ctx)
+}
+
+func (s *fakeIMRobotService) TestWebhook(ctx context.Context, input service.IMRobotTestWebhookInput) (*service.IMRobotTestWebhookResult, error) {
+	return s.testWebhook(ctx, input)
 }
