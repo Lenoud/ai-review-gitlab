@@ -146,6 +146,56 @@ func (r *ReviewLogRepository) FindAnalysisExecutionByID(ctx context.Context, id 
 	return analysisExecutionLogModelToService(&record), nil
 }
 
+func (r *ReviewLogRepository) SearchAnalysisExecution(ctx context.Context, query service.AnalysisExecutionLogSearchQuery) (*service.AnalysisExecutionLogPage, error) {
+	db := r.db.WithContext(ctx).Model(&model.ProjectAnalysisPlanExecutionLog{})
+	if query.ProjectID > 0 {
+		db = db.Where("project_id = ?", query.ProjectID)
+	}
+	if query.PlanID > 0 {
+		db = db.Where("plan_id = ?", query.PlanID)
+	}
+	if query.Status != "" {
+		db = db.Where("status = ?", query.Status)
+	}
+	if query.StartTime != nil {
+		db = db.Where("created_at >= ?", *query.StartTime)
+	}
+	if query.EndTime != nil {
+		db = db.Where("created_at <= ?", *query.EndTime)
+	}
+
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return nil, err
+	}
+
+	var records []model.ProjectAnalysisPlanExecutionLog
+	offset := (query.Page - 1) * query.Size
+	if err := db.Order("id DESC").Offset(offset).Limit(query.Size).Find(&records).Error; err != nil {
+		return nil, err
+	}
+
+	items := make([]service.ProjectAnalysisPlanExecutionLog, 0, len(records))
+	for i := range records {
+		items = append(items, *analysisExecutionLogModelToService(&records[i]))
+	}
+	return &service.AnalysisExecutionLogPage{Items: items, Total: total, Page: query.Page, Size: query.Size}, nil
+}
+
+func (r *ReviewLogRepository) UpdateAnalysisExecutionShareToken(ctx context.Context, id uint, token string, expiresAt int64) (*service.ProjectAnalysisPlanExecutionLog, error) {
+	result := r.db.WithContext(ctx).Model(&model.ProjectAnalysisPlanExecutionLog{}).Where("id = ?", id).Updates(map[string]any{
+		"share_token":            token,
+		"share_token_expires_at": expiresAt,
+	})
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, service.ErrReviewLogNotFound
+	}
+	return r.FindAnalysisExecutionByID(ctx, id)
+}
+
 func (r *ReviewLogRepository) SearchMergeRequest(ctx context.Context, query service.ReviewLogSearchQuery) (*service.MergeRequestReviewLogPage, error) {
 	db := applyCommonReviewLogFilters(r.db.WithContext(ctx).Model(&model.MergeRequestReviewLog{}), query)
 	if query.Branch != "" {

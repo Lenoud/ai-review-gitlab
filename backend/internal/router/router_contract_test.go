@@ -200,6 +200,14 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 		case "/api/v1/admin/push-review-log/generate-share-token/1",
 			"/api/v1/admin/merge-request-review-log/generate-share-token/1":
 			expectedStatus = http.StatusNotFound
+		case "/api/v1/admin/project-analysis-plan-execution-log/get":
+			expectedStatus = http.StatusBadRequest
+		case "/api/v1/admin/project-analysis-plan-execution-log/search":
+			expectedStatus = http.StatusOK
+		case "/api/v1/admin/project-analysis-plan-execution-log/html-report/1":
+			expectedStatus = http.StatusOK
+		case "/api/v1/admin/project-analysis-plan-execution-log/generate-share-token/1":
+			expectedStatus = http.StatusNotFound
 		}
 		require.Equal(t, expectedStatus, w.Code, "%s %s with token", route.method, route.path)
 	}
@@ -213,6 +221,7 @@ func TestAdminProtectedRoutesReturnForbiddenWithoutPermission(t *testing.T) {
 		ProjectGitLabHandler: handler.NewProjectGitLabHandler(&contractProjectGitLabService{}),
 		LLMModelHandler:      handler.NewLLMModelHandler(&contractLLMModelService{}),
 		ReviewLogHandler:     handler.NewReviewLogHandler(&contractReviewLogService{}),
+		AnalysisLogHandler:   handler.NewAnalysisExecutionLogHandler(&contractAnalysisExecutionLogService{}),
 		AIReviewTraceHandler: handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
 		OpenReportHandler:    handler.NewOpenReportHandler(&contractOpenReportService{}),
 		RBACHandler:          handler.NewRBACHandler(&contractRBACService{}),
@@ -240,6 +249,7 @@ func newContractRouter() *gin.Engine {
 		ProjectGitLabHandler: handler.NewProjectGitLabHandler(&contractProjectGitLabService{}),
 		LLMModelHandler:      handler.NewLLMModelHandler(&contractLLMModelService{}),
 		ReviewLogHandler:     handler.NewReviewLogHandler(&contractReviewLogService{}),
+		AnalysisLogHandler:   handler.NewAnalysisExecutionLogHandler(&contractAnalysisExecutionLogService{}),
 		AIReviewTraceHandler: handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
 		OpenReportHandler:    handler.NewOpenReportHandler(&contractOpenReportService{}),
 		RBACHandler:          handler.NewRBACHandler(&contractRBACService{}),
@@ -457,6 +467,34 @@ func (s *contractReviewLogService) GenerateMergeRequestShareToken(ctx context.Co
 
 func (s *contractReviewLogService) GetShareToken(ctx context.Context, eventType string, eventID uint) (*service.ReviewLogShareToken, error) {
 	return nil, service.ErrInvalidReviewLogInput
+}
+
+type contractAnalysisExecutionLogService struct{}
+
+func (s *contractAnalysisExecutionLogService) Get(ctx context.Context, id uint) (*service.ProjectAnalysisPlanExecutionLog, error) {
+	if id == 1 {
+		return &service.ProjectAnalysisPlanExecutionLog{
+			ID:            1,
+			ProjectID:     7,
+			PlanID:        3,
+			Status:        "succeeded",
+			ResultContent: "analysis",
+		}, nil
+	}
+	return nil, service.ErrInvalidReviewLogInput
+}
+
+func (s *contractAnalysisExecutionLogService) Search(ctx context.Context, query service.AnalysisExecutionLogSearchQuery) (*service.AnalysisExecutionLogPage, error) {
+	return &service.AnalysisExecutionLogPage{
+		Items: []service.ProjectAnalysisPlanExecutionLog{},
+		Total: 0,
+		Page:  1,
+		Size:  20,
+	}, nil
+}
+
+func (s *contractAnalysisExecutionLogService) GenerateShareToken(ctx context.Context, id uint) (*service.ReviewLogShareToken, error) {
+	return nil, service.ErrReviewLogNotFound
 }
 
 type contractOpenReportService struct{}

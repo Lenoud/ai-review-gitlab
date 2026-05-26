@@ -20,6 +20,7 @@ type Dependencies struct {
 	ProjectGitLabHandler *handler.ProjectGitLabHandler
 	LLMModelHandler      *handler.LLMModelHandler
 	ReviewLogHandler     *handler.ReviewLogHandler
+	AnalysisLogHandler   *handler.AnalysisExecutionLogHandler
 	AIReviewTraceHandler *handler.AIReviewTraceHandler
 	OpenReportHandler    *handler.OpenReportHandler
 	WebhookHandler       *handler.WebhookHandler
@@ -60,6 +61,7 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 	registerProjectGitLabRoutes(admin, deps.ProjectGitLabHandler)
 	registerLLMModelRoutes(admin, deps.LLMModelHandler)
 	registerReviewLogRoutes(admin, deps.ReviewLogHandler)
+	registerAnalysisExecutionLogRoutes(admin, deps.AnalysisLogHandler)
 	registerAIReviewTraceRoutes(admin, deps.AIReviewTraceHandler)
 	registerRBACRoutes(admin, deps.RBACHandler)
 	registerRoutes(admin, []routeDef{
@@ -94,10 +96,6 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 		{http.MethodPost, "/project-analysis-plan/delete", "project-analysis-plan:write"},
 		{http.MethodGet, "/project-analysis-plan/search", "project-analysis-plan:read"},
 		{http.MethodPost, "/project-analysis-plan-execution-log/test-run", "project-analysis-plan:write"},
-		{http.MethodGet, "/project-analysis-plan-execution-log/get", "project-analysis-plan:read"},
-		{http.MethodGet, "/project-analysis-plan-execution-log/search", "project-analysis-plan:read"},
-		{http.MethodGet, "/project-analysis-plan-execution-log/html-report/:logId", "project-analysis-plan:read"},
-		{http.MethodPost, "/project-analysis-plan-execution-log/generate-share-token/:logId", "project-analysis-plan:write"},
 
 		{http.MethodPost, "/user/create", "rbac:write"},
 		{http.MethodPost, "/user/update", "rbac:write"},
@@ -117,6 +115,13 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 		{http.MethodGet, "/system/config", "system:read"},
 		{http.MethodPost, "/system/config/base-url", "system:write"},
 	})
+}
+
+func registerAnalysisExecutionLogRoutes(group *gin.RouterGroup, analysisLogHandler *handler.AnalysisExecutionLogHandler) {
+	group.GET("/project-analysis-plan-execution-log/get", middleware.RequirePermission("project-analysis-plan:read"), analysisLogHandler.Get)
+	group.GET("/project-analysis-plan-execution-log/search", middleware.RequirePermission("project-analysis-plan:read"), analysisLogHandler.Search)
+	group.GET("/project-analysis-plan-execution-log/html-report/:logId", middleware.RequirePermission("project-analysis-plan:read"), analysisLogHandler.HTMLReport)
+	group.POST("/project-analysis-plan-execution-log/generate-share-token/:logId", middleware.RequirePermission("project-analysis-plan:write"), analysisLogHandler.GenerateShareToken)
 }
 
 func registerRBACRoutes(group *gin.RouterGroup, rbacHandler *handler.RBACHandler) {

@@ -91,7 +91,7 @@ func (s *OpenReportService) AnalysisReport(ctx context.Context, input AnalysisRe
 	if !validShareToken(input.Token, log.ShareToken, log.ShareTokenExpiresAt, s.now()) {
 		return "", ErrReviewLogNotFound
 	}
-	return buildAnalysisReportHTML(log), nil
+	return BuildAnalysisExecutionReportHTML(log), nil
 }
 
 func validShareToken(inputToken string, storedToken string, expiresAt int64, now time.Time) bool {
@@ -176,7 +176,7 @@ func buildCodeReviewReportHTML(view codeReviewReportView) string {
 	)
 }
 
-func buildAnalysisReportHTML(log *ProjectAnalysisPlanExecutionLog) string {
+func BuildAnalysisExecutionReportHTML(log *ProjectAnalysisPlanExecutionLog) string {
 	return fmt.Sprintf(`<!doctype html>
 <html lang="zh-CN">
 <head>

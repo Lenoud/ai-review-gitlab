@@ -53,6 +53,56 @@ func TestReviewLogRepositoryFindAnalysisExecutionByIDMapsNotFound(t *testing.T) 
 	require.ErrorIs(t, err, service.ErrReviewLogNotFound)
 }
 
+func TestReviewLogRepositorySearchesAnalysisExecutionLogs(t *testing.T) {
+	db := openAnalysisExecutionLogRepositoryTestDB(t)
+	now := time.Date(2026, 5, 26, 11, 0, 0, 0, time.UTC)
+	records := []model.ProjectAnalysisPlanExecutionLog{
+		{ProjectID: 7, PlanID: 3, Status: "succeeded", ResultContent: "newest", StartedAt: now.Add(-time.Hour), CompletedAt: now},
+		{ProjectID: 7, PlanID: 3, Status: "failed", ResultContent: "wrong status", StartedAt: now.Add(-2 * time.Hour), CompletedAt: now.Add(-time.Hour)},
+		{ProjectID: 8, PlanID: 3, Status: "succeeded", ResultContent: "wrong project", StartedAt: now.Add(-3 * time.Hour), CompletedAt: now.Add(-2 * time.Hour)},
+		{ProjectID: 7, PlanID: 4, Status: "succeeded", ResultContent: "wrong plan", StartedAt: now.Add(-4 * time.Hour), CompletedAt: now.Add(-3 * time.Hour)},
+	}
+	require.NoError(t, db.Create(&records).Error)
+	repo := NewReviewLogRepository(db)
+
+	page, err := repo.SearchAnalysisExecution(context.Background(), service.AnalysisExecutionLogSearchQuery{
+		ProjectID: 7,
+		PlanID:    3,
+		Status:    "succeeded",
+		Page:      1,
+		Size:      10,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, int64(1), page.Total)
+	require.Len(t, page.Items, 1)
+	require.Equal(t, "newest", page.Items[0].ResultContent)
+	require.Equal(t, 1, page.Page)
+	require.Equal(t, 10, page.Size)
+}
+
+func TestReviewLogRepositoryUpdatesAnalysisExecutionShareToken(t *testing.T) {
+	db := openAnalysisExecutionLogRepositoryTestDB(t)
+	record := model.ProjectAnalysisPlanExecutionLog{
+		ProjectID:     7,
+		PlanID:        3,
+		Status:        "succeeded",
+		ResultContent: "analysis",
+	}
+	require.NoError(t, db.Create(&record).Error)
+	repo := NewReviewLogRepository(db)
+
+	got, err := repo.UpdateAnalysisExecutionShareToken(context.Background(), record.ID, "share-token", 1770000000000)
+
+	require.NoError(t, err)
+	require.Equal(t, "share-token", got.ShareToken)
+	require.Equal(t, int64(1770000000000), got.ShareTokenExpiresAt)
+
+	var stored model.ProjectAnalysisPlanExecutionLog
+	require.NoError(t, db.First(&stored, record.ID).Error)
+	require.Equal(t, "share-token", stored.ShareToken)
+}
+
 func openAnalysisExecutionLogRepositoryTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
