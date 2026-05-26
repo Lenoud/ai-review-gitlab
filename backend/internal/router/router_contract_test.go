@@ -64,6 +64,14 @@ func TestRouterDoesNotKeepLegacyNotImplementedHandlers(t *testing.T) {
 	}
 }
 
+func TestResponsePackageDoesNotKeepLegacyNotImplementedHelper(t *testing.T) {
+	source, err := os.ReadFile("../pkg/response/response.go")
+	require.NoError(t, err)
+
+	require.NotContains(t, string(source), "func NotImplemented")
+	require.NotContains(t, string(source), "CodeNotImplemented")
+}
+
 func TestAdminRoutesRequireAuthAndReturnExpectedStatusWithDevToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := newContractRouter()

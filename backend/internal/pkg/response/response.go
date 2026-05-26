@@ -39,7 +39,3 @@ func Unauthorized(c *gin.Context, message string) {
 func Forbidden(c *gin.Context, message string) {
 	Error(c, http.StatusForbidden, apperrors.CodeForbidden, message)
 }
-
-func NotImplemented(c *gin.Context) {
-	Error(c, http.StatusNotImplemented, apperrors.CodeNotImplemented, "接口暂未实现")
-}
