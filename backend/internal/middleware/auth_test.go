@@ -67,6 +67,57 @@ func TestJWTAuthRejectsInvalidAccessToken(t *testing.T) {
 	require.Equal(t, http.StatusUnauthorized, w.Code)
 }
 
+func TestRequirePermissionAllowsAdminRole(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/admin", func(c *gin.Context) {
+		SetCurrentSubject(c, service.AuthSubject{UserID: 1, Username: "admin", Roles: []string{"admin"}})
+		c.Next()
+	}, RequirePermission("project:write"), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestRequirePermissionAllowsExplicitPermission(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/admin", func(c *gin.Context) {
+		SetCurrentSubject(c, service.AuthSubject{UserID: 2, Username: "reviewer", Permissions: []string{"project:write"}})
+		c.Next()
+	}, RequirePermission("project:write"), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestRequirePermissionRejectsMissingPermission(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/admin", func(c *gin.Context) {
+		SetCurrentSubject(c, service.AuthSubject{UserID: 2, Username: "reviewer", Permissions: []string{"review-log:read"}})
+		c.Next()
+	}, RequirePermission("project:write"), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusForbidden, w.Code)
+}
+
 type fakeTokenValidator struct {
 	token   string
 	subject *service.AuthSubject

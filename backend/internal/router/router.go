@@ -9,8 +9,9 @@ import (
 )
 
 type routeDef struct {
-	method string
-	path   string
+	method     string
+	path       string
+	permission string
 }
 
 type Dependencies struct {
@@ -60,123 +61,127 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 	registerReviewLogRoutes(admin, deps.ReviewLogHandler)
 	registerAIReviewTraceRoutes(admin, deps.AIReviewTraceHandler)
 	registerRoutes(admin, []routeDef{
-		{http.MethodPost, "/im-robot/create"},
-		{http.MethodPost, "/im-robot/update"},
-		{http.MethodGet, "/im-robot/get"},
-		{http.MethodPost, "/im-robot/delete"},
-		{http.MethodGet, "/im-robot/search"},
-		{http.MethodGet, "/im-robot/list-enabled"},
-		{http.MethodPost, "/im-robot/test-webhook"},
+		{http.MethodPost, "/im-robot/create", "im-robot:write"},
+		{http.MethodPost, "/im-robot/update", "im-robot:write"},
+		{http.MethodGet, "/im-robot/get", "im-robot:read"},
+		{http.MethodPost, "/im-robot/delete", "im-robot:write"},
+		{http.MethodGet, "/im-robot/search", "im-robot:read"},
+		{http.MethodGet, "/im-robot/list-enabled", "im-robot:read"},
+		{http.MethodPost, "/im-robot/test-webhook", "im-robot:write"},
 
-		{http.MethodPost, "/member-im-mapping/create"},
-		{http.MethodPost, "/member-im-mapping/update"},
-		{http.MethodGet, "/member-im-mapping/get"},
-		{http.MethodPost, "/member-im-mapping/delete"},
-		{http.MethodGet, "/member-im-mapping/search"},
+		{http.MethodPost, "/member-im-mapping/create", "member-im-mapping:write"},
+		{http.MethodPost, "/member-im-mapping/update", "member-im-mapping:write"},
+		{http.MethodGet, "/member-im-mapping/get", "member-im-mapping:read"},
+		{http.MethodPost, "/member-im-mapping/delete", "member-im-mapping:write"},
+		{http.MethodGet, "/member-im-mapping/search", "member-im-mapping:read"},
 
-		{http.MethodPost, "/project-template/create"},
-		{http.MethodPost, "/project-template/update"},
-		{http.MethodGet, "/project-template/get"},
-		{http.MethodGet, "/project-template/list"},
-		{http.MethodPost, "/project-template/delete"},
-		{http.MethodGet, "/project-template/review-rule/list-by-template-id"},
-		{http.MethodPost, "/project-template/review-rule/create"},
-		{http.MethodPost, "/project-template/review-rule/update"},
-		{http.MethodGet, "/project-template/review-rule/get"},
-		{http.MethodPost, "/project-template/review-rule/delete"},
+		{http.MethodPost, "/project-template/create", "project-template:write"},
+		{http.MethodPost, "/project-template/update", "project-template:write"},
+		{http.MethodGet, "/project-template/get", "project-template:read"},
+		{http.MethodGet, "/project-template/list", "project-template:read"},
+		{http.MethodPost, "/project-template/delete", "project-template:write"},
+		{http.MethodGet, "/project-template/review-rule/list-by-template-id", "project-template:read"},
+		{http.MethodPost, "/project-template/review-rule/create", "project-template:write"},
+		{http.MethodPost, "/project-template/review-rule/update", "project-template:write"},
+		{http.MethodGet, "/project-template/review-rule/get", "project-template:read"},
+		{http.MethodPost, "/project-template/review-rule/delete", "project-template:write"},
 
-		{http.MethodPost, "/project-analysis-plan/create"},
-		{http.MethodPost, "/project-analysis-plan/update"},
-		{http.MethodGet, "/project-analysis-plan/get"},
-		{http.MethodPost, "/project-analysis-plan/delete"},
-		{http.MethodGet, "/project-analysis-plan/search"},
-		{http.MethodPost, "/project-analysis-plan-execution-log/test-run"},
-		{http.MethodGet, "/project-analysis-plan-execution-log/get"},
-		{http.MethodGet, "/project-analysis-plan-execution-log/search"},
-		{http.MethodGet, "/project-analysis-plan-execution-log/html-report/:logId"},
-		{http.MethodPost, "/project-analysis-plan-execution-log/generate-share-token/:logId"},
+		{http.MethodPost, "/project-analysis-plan/create", "project-analysis-plan:write"},
+		{http.MethodPost, "/project-analysis-plan/update", "project-analysis-plan:write"},
+		{http.MethodGet, "/project-analysis-plan/get", "project-analysis-plan:read"},
+		{http.MethodPost, "/project-analysis-plan/delete", "project-analysis-plan:write"},
+		{http.MethodGet, "/project-analysis-plan/search", "project-analysis-plan:read"},
+		{http.MethodPost, "/project-analysis-plan-execution-log/test-run", "project-analysis-plan:write"},
+		{http.MethodGet, "/project-analysis-plan-execution-log/get", "project-analysis-plan:read"},
+		{http.MethodGet, "/project-analysis-plan-execution-log/search", "project-analysis-plan:read"},
+		{http.MethodGet, "/project-analysis-plan-execution-log/html-report/:logId", "project-analysis-plan:read"},
+		{http.MethodPost, "/project-analysis-plan-execution-log/generate-share-token/:logId", "project-analysis-plan:write"},
 
-		{http.MethodPost, "/user/create"},
-		{http.MethodPost, "/user/update"},
-		{http.MethodGet, "/user/get"},
-		{http.MethodGet, "/user/search"},
-		{http.MethodGet, "/user/role-options"},
-		{http.MethodGet, "/role/list"},
-		{http.MethodPost, "/role/create"},
-		{http.MethodPost, "/role/update"},
-		{http.MethodGet, "/role/get"},
-		{http.MethodPost, "/role/delete"},
-		{http.MethodGet, "/role/menu-permissions"},
+		{http.MethodPost, "/user/create", "rbac:write"},
+		{http.MethodPost, "/user/update", "rbac:write"},
+		{http.MethodGet, "/user/get", "rbac:read"},
+		{http.MethodGet, "/user/search", "rbac:read"},
+		{http.MethodGet, "/user/role-options", "rbac:read"},
+		{http.MethodGet, "/role/list", "rbac:read"},
+		{http.MethodPost, "/role/create", "rbac:write"},
+		{http.MethodPost, "/role/update", "rbac:write"},
+		{http.MethodGet, "/role/get", "rbac:read"},
+		{http.MethodPost, "/role/delete", "rbac:write"},
+		{http.MethodGet, "/role/menu-permissions", "rbac:read"},
 
-		{http.MethodGet, "/stats"},
-		{http.MethodGet, "/member/commit-summary"},
-		{http.MethodGet, "/sys-log/get"},
-		{http.MethodGet, "/sys-log/search"},
-		{http.MethodGet, "/system/info"},
-		{http.MethodGet, "/system/config"},
-		{http.MethodPost, "/system/config/base-url"},
+		{http.MethodGet, "/stats", "stats:read"},
+		{http.MethodGet, "/member/commit-summary", "stats:read"},
+		{http.MethodGet, "/sys-log/get", "sys-log:read"},
+		{http.MethodGet, "/sys-log/search", "sys-log:read"},
+		{http.MethodGet, "/system/info", "system:read"},
+		{http.MethodGet, "/system/config", "system:read"},
+		{http.MethodPost, "/system/config/base-url", "system:write"},
 	})
 }
 
 func registerReviewLogRoutes(group *gin.RouterGroup, reviewLogHandler *handler.ReviewLogHandler) {
-	group.GET("/push-review-log/get", reviewLogHandler.GetPush)
-	group.GET("/push-review-log/search", reviewLogHandler.SearchPush)
-	group.POST("/push-review-log/delete", reviewLogHandler.DeletePush)
-	group.GET("/push-review-log/authors", reviewLogHandler.PushAuthors)
-	group.GET("/push-review-log/project-names", reviewLogHandler.PushProjectNames)
-	group.POST("/push-review-log/generate-share-token/:logId", reviewLogHandler.GeneratePushShareToken)
-	group.GET("/merge-request-review-log/get", reviewLogHandler.GetMergeRequest)
-	group.GET("/merge-request-review-log/search", reviewLogHandler.SearchMergeRequest)
-	group.POST("/merge-request-review-log/delete", reviewLogHandler.DeleteMergeRequest)
-	group.GET("/merge-request-review-log/authors", reviewLogHandler.MergeRequestAuthors)
-	group.GET("/merge-request-review-log/project-names", reviewLogHandler.MergeRequestProjectNames)
-	group.POST("/merge-request-review-log/generate-share-token/:logId", reviewLogHandler.GenerateMergeRequestShareToken)
-	group.GET("/review-log/get-share-token", reviewLogHandler.GetShareToken)
+	group.GET("/push-review-log/get", middleware.RequirePermission("review-log:read"), reviewLogHandler.GetPush)
+	group.GET("/push-review-log/search", middleware.RequirePermission("review-log:read"), reviewLogHandler.SearchPush)
+	group.POST("/push-review-log/delete", middleware.RequirePermission("review-log:write"), reviewLogHandler.DeletePush)
+	group.GET("/push-review-log/authors", middleware.RequirePermission("review-log:read"), reviewLogHandler.PushAuthors)
+	group.GET("/push-review-log/project-names", middleware.RequirePermission("review-log:read"), reviewLogHandler.PushProjectNames)
+	group.POST("/push-review-log/generate-share-token/:logId", middleware.RequirePermission("review-log:write"), reviewLogHandler.GeneratePushShareToken)
+	group.GET("/merge-request-review-log/get", middleware.RequirePermission("review-log:read"), reviewLogHandler.GetMergeRequest)
+	group.GET("/merge-request-review-log/search", middleware.RequirePermission("review-log:read"), reviewLogHandler.SearchMergeRequest)
+	group.POST("/merge-request-review-log/delete", middleware.RequirePermission("review-log:write"), reviewLogHandler.DeleteMergeRequest)
+	group.GET("/merge-request-review-log/authors", middleware.RequirePermission("review-log:read"), reviewLogHandler.MergeRequestAuthors)
+	group.GET("/merge-request-review-log/project-names", middleware.RequirePermission("review-log:read"), reviewLogHandler.MergeRequestProjectNames)
+	group.POST("/merge-request-review-log/generate-share-token/:logId", middleware.RequirePermission("review-log:write"), reviewLogHandler.GenerateMergeRequestShareToken)
+	group.GET("/review-log/get-share-token", middleware.RequirePermission("review-log:read"), reviewLogHandler.GetShareToken)
 }
 
 func registerAIReviewTraceRoutes(group *gin.RouterGroup, traceHandler *handler.AIReviewTraceHandler) {
-	group.POST("/ai-review-trace/create", traceHandler.Create)
-	group.GET("/ai-review-trace/get", traceHandler.Get)
+	group.POST("/ai-review-trace/create", middleware.RequirePermission("ai-review-trace:write"), traceHandler.Create)
+	group.GET("/ai-review-trace/get", middleware.RequirePermission("ai-review-trace:read"), traceHandler.Get)
 }
 
 func registerProjectRoutes(group *gin.RouterGroup, projectHandler *handler.ProjectHandler) {
-	group.POST("/project/create", projectHandler.Create)
-	group.POST("/project/batch-create", projectHandler.BatchCreate)
-	group.POST("/project/update", projectHandler.Update)
-	group.GET("/project/get", projectHandler.Get)
-	group.POST("/project/delete", projectHandler.Delete)
-	group.GET("/project/search", projectHandler.Search)
-	group.POST("/project/web-urls/exists", projectHandler.WebURLExists)
-	group.GET("/project/review-prompt/get", projectHandler.GetReviewPrompt)
-	group.GET("/project/review-prompt/default", projectHandler.GetDefaultReviewPrompt)
-	group.POST("/project/review-prompt/update", projectHandler.UpdateReviewPrompt)
-	group.POST("/project/review-prompt/delete", projectHandler.DeleteReviewPrompt)
-	group.POST("/project/review-prompt/test", projectHandler.TestReviewPrompt)
+	group.POST("/project/create", middleware.RequirePermission("project:write"), projectHandler.Create)
+	group.POST("/project/batch-create", middleware.RequirePermission("project:write"), projectHandler.BatchCreate)
+	group.POST("/project/update", middleware.RequirePermission("project:write"), projectHandler.Update)
+	group.GET("/project/get", middleware.RequirePermission("project:read"), projectHandler.Get)
+	group.POST("/project/delete", middleware.RequirePermission("project:write"), projectHandler.Delete)
+	group.GET("/project/search", middleware.RequirePermission("project:read"), projectHandler.Search)
+	group.POST("/project/web-urls/exists", middleware.RequirePermission("project:read"), projectHandler.WebURLExists)
+	group.GET("/project/review-prompt/get", middleware.RequirePermission("project:read"), projectHandler.GetReviewPrompt)
+	group.GET("/project/review-prompt/default", middleware.RequirePermission("project:read"), projectHandler.GetDefaultReviewPrompt)
+	group.POST("/project/review-prompt/update", middleware.RequirePermission("project:write"), projectHandler.UpdateReviewPrompt)
+	group.POST("/project/review-prompt/delete", middleware.RequirePermission("project:write"), projectHandler.DeleteReviewPrompt)
+	group.POST("/project/review-prompt/test", middleware.RequirePermission("project:read"), projectHandler.TestReviewPrompt)
 }
 
 func registerProjectGitLabRoutes(group *gin.RouterGroup, gitLabHandler *handler.ProjectGitLabHandler) {
-	group.POST("/project/gitlab/remote-search", gitLabHandler.RemoteSearch)
-	group.POST("/project/gitlab/group-search", gitLabHandler.GroupSearch)
+	group.POST("/project/gitlab/remote-search", middleware.RequirePermission("project:read"), gitLabHandler.RemoteSearch)
+	group.POST("/project/gitlab/group-search", middleware.RequirePermission("project:read"), gitLabHandler.GroupSearch)
 }
 
 func registerLLMModelRoutes(group *gin.RouterGroup, llmModelHandler *handler.LLMModelHandler) {
-	group.POST("/llm-model/create", llmModelHandler.Create)
-	group.POST("/llm-model/update", llmModelHandler.Update)
-	group.GET("/llm-model/get", llmModelHandler.Get)
-	group.POST("/llm-model/delete", llmModelHandler.Delete)
-	group.GET("/llm-model/search", llmModelHandler.Search)
-	group.GET("/llm-model/default", llmModelHandler.Default)
-	group.POST("/llm-model/set-default", llmModelHandler.SetDefault)
-	group.POST("/llm-test/connection", llmModelHandler.TestConnection)
+	group.POST("/llm-model/create", middleware.RequirePermission("llm-model:write"), llmModelHandler.Create)
+	group.POST("/llm-model/update", middleware.RequirePermission("llm-model:write"), llmModelHandler.Update)
+	group.GET("/llm-model/get", middleware.RequirePermission("llm-model:read"), llmModelHandler.Get)
+	group.POST("/llm-model/delete", middleware.RequirePermission("llm-model:write"), llmModelHandler.Delete)
+	group.GET("/llm-model/search", middleware.RequirePermission("llm-model:read"), llmModelHandler.Search)
+	group.GET("/llm-model/default", middleware.RequirePermission("llm-model:read"), llmModelHandler.Default)
+	group.POST("/llm-model/set-default", middleware.RequirePermission("llm-model:write"), llmModelHandler.SetDefault)
+	group.POST("/llm-test/connection", middleware.RequirePermission("llm-model:write"), llmModelHandler.TestConnection)
 }
 
 func registerRoutes(group *gin.RouterGroup, routes []routeDef) {
 	for _, route := range routes {
+		handlers := []gin.HandlerFunc{handler.NotImplemented}
+		if route.permission != "" {
+			handlers = append([]gin.HandlerFunc{middleware.RequirePermission(route.permission)}, handlers...)
+		}
 		switch route.method {
 		case http.MethodGet:
-			group.GET(route.path, handler.NotImplemented)
+			group.GET(route.path, handlers...)
 		case http.MethodPost:
-			group.POST(route.path, handler.NotImplemented)
+			group.POST(route.path, handlers...)
 		}
 	}
 }

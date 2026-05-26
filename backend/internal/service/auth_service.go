@@ -31,6 +31,8 @@ type User struct {
 	PasswordHash string
 	Nickname     string
 	Status       string
+	Roles        []string
+	Permissions  []string
 }
 
 type UserRepository interface {
@@ -52,9 +54,11 @@ type TokenPair struct {
 }
 
 type AuthSubject struct {
-	UserID   uint   `json:"id"`
-	Username string `json:"username"`
-	Nickname string `json:"nickname"`
+	UserID      uint     `json:"id"`
+	Username    string   `json:"username"`
+	Nickname    string   `json:"nickname"`
+	Roles       []string `json:"roles,omitempty"`
+	Permissions []string `json:"permissions,omitempty"`
 }
 
 type AuthOptions struct {
@@ -161,6 +165,8 @@ func (s *AuthService) ValidateAccessToken(ctx context.Context, token string) (*A
 		return nil, ErrUserDisabled
 	}
 	subject.Nickname = user.Nickname
+	subject.Roles = user.Roles
+	subject.Permissions = user.Permissions
 	return subject, nil
 }
 

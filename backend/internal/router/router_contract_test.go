@@ -202,6 +202,33 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 	}
 }
 
+func TestAdminProtectedRoutesReturnForbiddenWithoutPermission(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := New(Dependencies{
+		AuthHandler:          NewAuthHandlerForTest(),
+		ProjectHandler:       handler.NewProjectHandler(&contractProjectService{}),
+		ProjectGitLabHandler: handler.NewProjectGitLabHandler(&contractProjectGitLabService{}),
+		LLMModelHandler:      handler.NewLLMModelHandler(&contractLLMModelService{}),
+		ReviewLogHandler:     handler.NewReviewLogHandler(&contractReviewLogService{}),
+		AIReviewTraceHandler: handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
+		OpenReportHandler:    handler.NewOpenReportHandler(&contractOpenReportService{}),
+		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
+			subject: &service.AuthSubject{
+				UserID:   2,
+				Username: "reviewer",
+				Nickname: "Reviewer",
+			},
+		}),
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/project/create", strings.NewReader(`{}`))
+	req.Header.Set("Authorization", "Bearer access-token")
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusForbidden, w.Code)
+}
+
 func newContractRouter() *gin.Engine {
 	return New(Dependencies{
 		AuthHandler:          NewAuthHandlerForTest(),
@@ -216,6 +243,7 @@ func newContractRouter() *gin.Engine {
 				UserID:   1,
 				Username: "admin",
 				Nickname: "Administrator",
+				Roles:    []string{"admin"},
 			},
 		}),
 	})

@@ -55,7 +55,37 @@ func CurrentSubject(c *gin.Context) (service.AuthSubject, bool) {
 
 func RequirePermission(permission string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		permission = strings.TrimSpace(permission)
+		if permission == "" {
+			c.Next()
+			return
+		}
+		subject, ok := CurrentSubject(c)
+		if !ok {
+			response.Unauthorized(c, "未认证")
+			c.Abort()
+			return
+		}
+		if !subjectAllows(subject, permission) {
+			response.Forbidden(c, "无权限")
+			c.Abort()
+			return
+		}
 		c.Set("permission", permission)
 		c.Next()
 	}
+}
+
+func subjectAllows(subject service.AuthSubject, permission string) bool {
+	for _, role := range subject.Roles {
+		if strings.EqualFold(strings.TrimSpace(role), "admin") {
+			return true
+		}
+	}
+	for _, allowed := range subject.Permissions {
+		if strings.EqualFold(strings.TrimSpace(allowed), permission) {
+			return true
+		}
+	}
+	return false
 }

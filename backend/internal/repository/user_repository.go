@@ -26,7 +26,7 @@ func (r *UserRepository) FindByUsername(ctx context.Context, username string) (*
 		}
 		return nil, err
 	}
-	return toServiceUser(&user), nil
+	return r.toServiceUser(ctx, &user)
 }
 
 func (r *UserRepository) FindByID(ctx context.Context, id uint) (*service.User, error) {
@@ -38,15 +38,50 @@ func (r *UserRepository) FindByID(ctx context.Context, id uint) (*service.User, 
 		}
 		return nil, err
 	}
-	return toServiceUser(&user), nil
+	return r.toServiceUser(ctx, &user)
 }
 
-func toServiceUser(user *model.SysUser) *service.User {
+func (r *UserRepository) toServiceUser(ctx context.Context, user *model.SysUser) (*service.User, error) {
+	roles, err := r.findRoleCodes(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	permissions, err := r.findPermissionCodes(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
 	return &service.User{
 		ID:           user.ID,
 		Username:     user.Username,
 		PasswordHash: user.PasswordHash,
 		Nickname:     user.Nickname,
 		Status:       user.Status,
-	}
+		Roles:        roles,
+		Permissions:  permissions,
+	}, nil
+}
+
+func (r *UserRepository) findRoleCodes(ctx context.Context, userID uint) ([]string, error) {
+	var roles []string
+	err := r.db.WithContext(ctx).
+		Table("sys_role AS r").
+		Select("r.code").
+		Joins("JOIN sys_user_role AS ur ON ur.role_id = r.id").
+		Where("ur.user_id = ?", userID).
+		Order("r.code ASC").
+		Pluck("r.code", &roles).Error
+	return roles, err
+}
+
+func (r *UserRepository) findPermissionCodes(ctx context.Context, userID uint) ([]string, error) {
+	var permissions []string
+	err := r.db.WithContext(ctx).
+		Table("sys_permission AS p").
+		Distinct("p.code").
+		Joins("JOIN sys_role_permission AS rp ON rp.permission_id = p.id").
+		Joins("JOIN sys_user_role AS ur ON ur.role_id = rp.role_id").
+		Where("ur.user_id = ?", userID).
+		Order("p.code ASC").
+		Pluck("p.code", &permissions).Error
+	return permissions, err
 }

@@ -34,6 +34,18 @@ func TestBootstrapAdminCreatesAdminUserAndRole(t *testing.T) {
 
 	var userRole model.SysUserRole
 	require.NoError(t, db.Where("user_id = ? AND role_id = ?", user.ID, role.ID).First(&userRole).Error)
+
+	var permissions []model.SysPermission
+	require.NoError(t, db.Find(&permissions).Error)
+	require.Len(t, permissions, len(builtinPermissions))
+
+	var projectWrite model.SysPermission
+	require.NoError(t, db.Where("code = ?", "project:write").First(&projectWrite).Error)
+	var rbacWrite model.SysPermission
+	require.NoError(t, db.Where("code = ?", "rbac:write").First(&rbacWrite).Error)
+
+	var rolePermission model.SysRolePermission
+	require.NoError(t, db.Where("role_id = ? AND permission_id = ?", role.ID, projectWrite.ID).First(&rolePermission).Error)
 }
 
 func TestBootstrapAdminUpdatesExistingAdminPassword(t *testing.T) {
