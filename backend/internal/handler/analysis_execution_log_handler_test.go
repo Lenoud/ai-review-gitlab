@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Lenoud/ai-review-gitlab/backend/internal/service"
@@ -92,10 +93,86 @@ func TestAnalysisExecutionLogHandlerGenerateShareTokenAndHTMLReport(t *testing.T
 	require.Contains(t, w.Body.String(), "analysis content")
 }
 
+func TestAnalysisExecutionLogHandlerTestRun(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	handler := NewAnalysisExecutionLogHandler(&fakeAnalysisExecutionLogService{
+		testRun: func(ctx context.Context, input service.AnalysisTestRunInput) (*service.ProjectAnalysisPlanExecutionLog, error) {
+			require.Equal(t, uint(7), input.ProjectID)
+			require.Equal(t, uint(3), input.PlanID)
+			require.Equal(t, "summarize", input.Prompt)
+			require.Equal(t, "weekly", input.PlanName)
+			require.True(t, input.IMEnabled)
+			require.Equal(t, uint(5), input.IMRobotID)
+			require.True(t, input.HTMLReportEnabled)
+			return &service.ProjectAnalysisPlanExecutionLog{ID: 22, ProjectID: 7, PlanID: 3, Status: "succeeded", ResultContent: "analysis"}, nil
+		},
+	})
+	r.POST("/test-run", handler.TestRun)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/test-run", strings.NewReader(`{"projectId":7,"planId":3,"prompt":"summarize","planName":"weekly","imEnabled":true,"imRobotId":5,"htmlReportEnabled":true}`))
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	data := body["data"].(map[string]any)
+	require.Equal(t, float64(22), data["id"])
+	require.Equal(t, "succeeded", data["status"])
+}
+
+func TestAnalysisExecutionLogHandlerTestRunMapsValidation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	handler := NewAnalysisExecutionLogHandler(&fakeAnalysisExecutionLogService{
+		testRun: func(ctx context.Context, input service.AnalysisTestRunInput) (*service.ProjectAnalysisPlanExecutionLog, error) {
+			return nil, service.ErrInvalidReviewLogInput
+		},
+	})
+	r.POST("/test-run", handler.TestRun)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/test-run", strings.NewReader(`{"projectId":7,"prompt":" "}`))
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestAnalysisExecutionLogHandlerTestRunMapsMissingDependencies(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{name: "project", err: service.ErrProjectNotFound},
+		{name: "model", err: service.ErrLLMModelNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := gin.New()
+			handler := NewAnalysisExecutionLogHandler(&fakeAnalysisExecutionLogService{
+				testRun: func(ctx context.Context, input service.AnalysisTestRunInput) (*service.ProjectAnalysisPlanExecutionLog, error) {
+					return nil, tt.err
+				},
+			})
+			r.POST("/test-run", handler.TestRun)
+
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPost, "/test-run", strings.NewReader(`{"projectId":7,"prompt":"summarize"}`))
+			r.ServeHTTP(w, req)
+
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+	}
+}
+
 type fakeAnalysisExecutionLogService struct {
 	get                func(context.Context, uint) (*service.ProjectAnalysisPlanExecutionLog, error)
 	search             func(context.Context, service.AnalysisExecutionLogSearchQuery) (*service.AnalysisExecutionLogPage, error)
 	generateShareToken func(context.Context, uint) (*service.ReviewLogShareToken, error)
+	testRun            func(context.Context, service.AnalysisTestRunInput) (*service.ProjectAnalysisPlanExecutionLog, error)
 }
 
 func (s *fakeAnalysisExecutionLogService) Get(ctx context.Context, id uint) (*service.ProjectAnalysisPlanExecutionLog, error) {
@@ -108,4 +185,8 @@ func (s *fakeAnalysisExecutionLogService) Search(ctx context.Context, query serv
 
 func (s *fakeAnalysisExecutionLogService) GenerateShareToken(ctx context.Context, id uint) (*service.ReviewLogShareToken, error) {
 	return s.generateShareToken(ctx, id)
+}
+
+func (s *fakeAnalysisExecutionLogService) TestRun(ctx context.Context, input service.AnalysisTestRunInput) (*service.ProjectAnalysisPlanExecutionLog, error) {
+	return s.testRun(ctx, input)
 }

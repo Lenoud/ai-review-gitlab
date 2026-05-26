@@ -63,7 +63,13 @@ func main() {
 	gitLabSvc := service.NewGitLabService(platformgitlab.NewServiceAdapter(nil))
 	reviewTaskSvc := service.NewReviewTaskService(repository.NewProjectRepository(db), repository.NewReviewTaskRepository(db), service.ReviewTaskOptions{})
 	reviewLogSvc := service.NewReviewLogService(repository.NewReviewLogRepository(db))
-	analysisLogSvc := service.NewAnalysisExecutionLogService(repository.NewReviewLogRepository(db))
+	analysisLogSvc := service.NewAnalysisExecutionLogServiceWithRunner(
+		repository.NewReviewLogRepository(db),
+		repository.NewProjectRepository(db),
+		repository.NewLLMModelRepository(db),
+		llm.NewOpenAICompatibleClient(nil),
+		time.Now,
+	)
 	aiReviewTraceSvc := service.NewAIReviewTraceService(repository.NewAIReviewTraceRepository(db))
 	openReportSvc := service.NewOpenReportService(repository.NewReviewLogRepository(db))
 	llmModelSvc := service.NewLLMModelService(repository.NewLLMModelRepository(db), llm.NewOpenAICompatibleChecker(nil))

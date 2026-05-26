@@ -39,9 +39,43 @@ func TestReviewLogRepositoryFindsAnalysisExecutionByID(t *testing.T) {
 	require.Equal(t, uint(3), got.PlanID)
 	require.Equal(t, "succeeded", got.Status)
 	require.Equal(t, "整体趋势稳定", got.ResultContent)
+	require.Equal(t, "", got.ResultActions)
 	require.Equal(t, "analysis-token", got.ShareToken)
 	require.Equal(t, int64(120000), got.DurationMs)
 	require.Equal(t, completedAt, got.CompletedAt)
+}
+
+func TestReviewLogRepositoryCreatesAnalysisExecution(t *testing.T) {
+	db := openAnalysisExecutionLogRepositoryTestDB(t)
+	repo := NewReviewLogRepository(db)
+	startedAt := time.Date(2026, 5, 26, 12, 0, 0, 0, time.UTC)
+	completedAt := startedAt.Add(3 * time.Second)
+
+	got, err := repo.CreateAnalysisExecution(context.Background(), service.AnalysisExecutionLogInput{
+		ProjectID:     7,
+		PlanID:        3,
+		Status:        service.AnalysisExecutionStatusFailed,
+		StartedAt:     startedAt,
+		CompletedAt:   completedAt,
+		DurationMs:    3000,
+		ResultContent: "partial",
+		ResultActions: `[{"type":"open"}]`,
+		ErrorMessage:  "llm unavailable",
+		ErrorStack:    "stack trace",
+	})
+
+	require.NoError(t, err)
+	require.NotZero(t, got.ID)
+	require.Equal(t, uint(7), got.ProjectID)
+	require.Equal(t, uint(3), got.PlanID)
+	require.Equal(t, service.AnalysisExecutionStatusFailed, got.Status)
+	require.Equal(t, "partial", got.ResultContent)
+	require.Equal(t, `[{"type":"open"}]`, got.ResultActions)
+	require.Equal(t, "llm unavailable", got.ErrorMessage)
+	require.Equal(t, "stack trace", got.ErrorStack)
+	require.Equal(t, startedAt, got.StartedAt)
+	require.Equal(t, completedAt, got.CompletedAt)
+	require.Equal(t, int64(3000), got.DurationMs)
 }
 
 func TestReviewLogRepositoryFindAnalysisExecutionByIDMapsNotFound(t *testing.T) {

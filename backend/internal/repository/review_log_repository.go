@@ -146,6 +146,25 @@ func (r *ReviewLogRepository) FindAnalysisExecutionByID(ctx context.Context, id 
 	return analysisExecutionLogModelToService(&record), nil
 }
 
+func (r *ReviewLogRepository) CreateAnalysisExecution(ctx context.Context, input service.AnalysisExecutionLogInput) (*service.ProjectAnalysisPlanExecutionLog, error) {
+	record := model.ProjectAnalysisPlanExecutionLog{
+		PlanID:        input.PlanID,
+		ProjectID:     input.ProjectID,
+		Status:        input.Status,
+		StartedAt:     input.StartedAt,
+		CompletedAt:   input.CompletedAt,
+		DurationMs:    input.DurationMs,
+		ResultContent: input.ResultContent,
+		ResultActions: input.ResultActions,
+		ErrorMessage:  input.ErrorMessage,
+		ErrorStack:    input.ErrorStack,
+	}
+	if err := r.db.WithContext(ctx).Create(&record).Error; err != nil {
+		return nil, err
+	}
+	return analysisExecutionLogModelToService(&record), nil
+}
+
 func (r *ReviewLogRepository) SearchAnalysisExecution(ctx context.Context, query service.AnalysisExecutionLogSearchQuery) (*service.AnalysisExecutionLogPage, error) {
 	db := r.db.WithContext(ctx).Model(&model.ProjectAnalysisPlanExecutionLog{})
 	if query.ProjectID > 0 {
@@ -453,8 +472,11 @@ func analysisExecutionLogModelToService(record *model.ProjectAnalysisPlanExecuti
 		ProjectID:           record.ProjectID,
 		Status:              record.Status,
 		ResultContent:       record.ResultContent,
+		ResultActions:       record.ResultActions,
 		ShareToken:          record.ShareToken,
 		ShareTokenExpiresAt: record.ShareTokenExpiresAt,
+		ErrorMessage:        record.ErrorMessage,
+		ErrorStack:          record.ErrorStack,
 		StartedAt:           record.StartedAt,
 		CompletedAt:         record.CompletedAt,
 		DurationMs:          record.DurationMs,

@@ -80,9 +80,6 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 	registerSystemRoutes(admin, deps.SystemHandler)
 	registerStatsRoutes(admin, deps.StatsHandler)
 	registerSysLogRoutes(admin, deps.SysLogHandler)
-	registerRoutes(admin, []routeDef{
-		{http.MethodPost, "/project-analysis-plan-execution-log/test-run", "project-analysis-plan:write"},
-	})
 }
 
 func registerStatsRoutes(group *gin.RouterGroup, statsHandler *handler.StatsHandler) {
@@ -144,6 +141,7 @@ func registerProjectAnalysisPlanRoutes(group *gin.RouterGroup, analysisPlanHandl
 }
 
 func registerAnalysisExecutionLogRoutes(group *gin.RouterGroup, analysisLogHandler *handler.AnalysisExecutionLogHandler) {
+	group.POST("/project-analysis-plan-execution-log/test-run", middleware.RequirePermission("project-analysis-plan:write"), analysisLogHandler.TestRun)
 	group.GET("/project-analysis-plan-execution-log/get", middleware.RequirePermission("project-analysis-plan:read"), analysisLogHandler.Get)
 	group.GET("/project-analysis-plan-execution-log/search", middleware.RequirePermission("project-analysis-plan:read"), analysisLogHandler.Search)
 	group.GET("/project-analysis-plan-execution-log/html-report/:logId", middleware.RequirePermission("project-analysis-plan:read"), analysisLogHandler.HTMLReport)

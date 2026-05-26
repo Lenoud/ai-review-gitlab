@@ -230,6 +230,8 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 			expectedStatus = http.StatusNotFound
 		case "/api/v1/admin/project-analysis-plan-execution-log/get":
 			expectedStatus = http.StatusBadRequest
+		case "/api/v1/admin/project-analysis-plan-execution-log/test-run":
+			expectedStatus = http.StatusBadRequest
 		case "/api/v1/admin/project-analysis-plan-execution-log/search":
 			expectedStatus = http.StatusOK
 		case "/api/v1/admin/project-analysis-plan-execution-log/html-report/1":
@@ -768,6 +770,10 @@ func (s *contractAnalysisExecutionLogService) Search(ctx context.Context, query 
 
 func (s *contractAnalysisExecutionLogService) GenerateShareToken(ctx context.Context, id uint) (*service.ReviewLogShareToken, error) {
 	return nil, service.ErrReviewLogNotFound
+}
+
+func (s *contractAnalysisExecutionLogService) TestRun(ctx context.Context, input service.AnalysisTestRunInput) (*service.ProjectAnalysisPlanExecutionLog, error) {
+	return nil, service.ErrInvalidReviewLogInput
 }
 
 type contractOpenReportService struct{}

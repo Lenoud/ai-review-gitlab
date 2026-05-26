@@ -25,8 +25,11 @@ type ProjectAnalysisPlanExecutionLog struct {
 	ProjectID           uint   `json:"projectId"`
 	Status              string `json:"status"`
 	ResultContent       string `json:"resultContent"`
+	ResultActions       string `json:"resultActions"`
 	ShareToken          string `json:"shareToken"`
 	ShareTokenExpiresAt int64  `json:"shareTokenExpiresAt"`
+	ErrorMessage        string `json:"errorMessage"`
+	ErrorStack          string `json:"errorStack"`
 	StartedAt           time.Time
 	CompletedAt         time.Time
 	DurationMs          int64 `json:"durationMs"`
