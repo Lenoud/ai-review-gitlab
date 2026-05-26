@@ -47,15 +47,7 @@ func (r *UserRepository) ListRoles(ctx context.Context) ([]service.Role, error) 
 	if err := r.db.WithContext(ctx).Order("code ASC").Find(&records).Error; err != nil {
 		return nil, err
 	}
-	roles := make([]service.Role, 0, len(records))
-	for _, record := range records {
-		roles = append(roles, service.Role{
-			ID:   record.ID,
-			Code: record.Code,
-			Name: record.Name,
-		})
-	}
-	return roles, nil
+	return rolesToService(records), nil
 }
 
 func (r *UserRepository) ListPermissionGroups(ctx context.Context) ([]service.PermissionGroup, error) {
@@ -172,6 +164,116 @@ func (r *UserRepository) DeleteRoles(ctx context.Context, ids []uint) error {
 	})
 }
 
+func (r *UserRepository) CreateUser(ctx context.Context, input service.AdminUserInput) (*service.AdminUser, error) {
+	record := model.SysUser{
+		Username:     input.Username,
+		PasswordHash: input.PasswordHash,
+		Nickname:     input.Nickname,
+		Remark:       input.Remark,
+		Status:       service.UserStatusEnabled,
+	}
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := validateRoleIDs(ctx, tx, input.RoleIDs); err != nil {
+			return err
+		}
+		if err := tx.Create(&record).Error; err != nil {
+			return mapUserWriteError(err)
+		}
+		return replaceUserRoles(ctx, tx, record.ID, input.RoleIDs)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return r.FindAdminUserByID(ctx, record.ID)
+}
+
+func (r *UserRepository) UpdateUser(ctx context.Context, id uint, input service.AdminUserInput) (*service.AdminUser, error) {
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := validateRoleIDs(ctx, tx, input.RoleIDs); err != nil {
+			return err
+		}
+		updates := map[string]any{
+			"nickname": input.Nickname,
+			"remark":   input.Remark,
+		}
+		if input.Username != "" {
+			updates["username"] = input.Username
+		}
+		if input.PasswordHash != "" {
+			updates["password_hash"] = input.PasswordHash
+		}
+		result := tx.Model(&model.SysUser{}).Where("id = ?", id).Updates(updates)
+		if result.Error != nil {
+			return mapUserWriteError(result.Error)
+		}
+		var count int64
+		if err := tx.Model(&model.SysUser{}).Where("id = ?", id).Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			return service.ErrUserNotFound
+		}
+		return replaceUserRoles(ctx, tx, id, input.RoleIDs)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return r.FindAdminUserByID(ctx, id)
+}
+
+func (r *UserRepository) FindAdminUserByID(ctx context.Context, id uint) (*service.AdminUser, error) {
+	var record model.SysUser
+	err := r.db.WithContext(ctx).First(&record, id).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, service.ErrUserNotFound
+		}
+		return nil, err
+	}
+	roles, err := r.findUserRoles(ctx, []uint{id})
+	if err != nil {
+		return nil, err
+	}
+	return adminUserToService(&record, roles[id]), nil
+}
+
+func (r *UserRepository) SearchUsers(ctx context.Context, query service.AdminUserSearchQuery) (*service.AdminUserPage, error) {
+	db := r.db.WithContext(ctx).Model(&model.SysUser{})
+	if query.Keyword != "" {
+		like := "%" + query.Keyword + "%"
+		db = db.Where("username LIKE ? OR nickname LIKE ?", like, like)
+	}
+
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return nil, err
+	}
+
+	var records []model.SysUser
+	offset := (query.Page - 1) * query.Size
+	if err := db.Order("id DESC").Limit(query.Size).Offset(offset).Find(&records).Error; err != nil {
+		return nil, err
+	}
+
+	userIDs := make([]uint, 0, len(records))
+	for _, record := range records {
+		userIDs = append(userIDs, record.ID)
+	}
+	rolesByUserID, err := r.findUserRoles(ctx, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]service.AdminUser, 0, len(records))
+	for i := range records {
+		items = append(items, *adminUserToService(&records[i], rolesByUserID[records[i].ID]))
+	}
+	return &service.AdminUserPage{Items: items, Total: total, Page: query.Page, Size: query.Size}, nil
+}
+
+func (r *UserRepository) ListRoleOptions(ctx context.Context) ([]service.Role, error) {
+	return r.ListRoles(ctx)
+}
+
 func (r *UserRepository) toServiceUser(ctx context.Context, user *model.SysUser) (*service.User, error) {
 	roles, err := r.findRoleCodes(ctx, user.ID)
 	if err != nil {
@@ -190,6 +292,37 @@ func (r *UserRepository) toServiceUser(ctx context.Context, user *model.SysUser)
 		Roles:        roles,
 		Permissions:  permissions,
 	}, nil
+}
+
+func (r *UserRepository) findUserRoles(ctx context.Context, userIDs []uint) (map[uint][]service.Role, error) {
+	result := map[uint][]service.Role{}
+	if len(userIDs) == 0 {
+		return result, nil
+	}
+	var rows []struct {
+		UserID uint
+		ID     uint
+		Code   string
+		Name   string
+	}
+	err := r.db.WithContext(ctx).
+		Table("sys_user_role AS ur").
+		Select("ur.user_id, r.id, r.code, r.name").
+		Joins("JOIN sys_role AS r ON r.id = ur.role_id").
+		Where("ur.user_id IN ?", userIDs).
+		Order("r.code ASC").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		result[row.UserID] = append(result[row.UserID], service.Role{
+			ID:   row.ID,
+			Code: row.Code,
+			Name: row.Name,
+		})
+	}
+	return result, nil
 }
 
 func (r *UserRepository) findRoleCodes(ctx context.Context, userID uint) ([]string, error) {
@@ -253,6 +386,35 @@ func replaceRolePermissions(ctx context.Context, tx *gorm.DB, roleID uint, permi
 	return nil
 }
 
+func validateRoleIDs(ctx context.Context, tx *gorm.DB, roleIDs []uint) error {
+	if len(roleIDs) == 0 {
+		return service.ErrInvalidRBACInput
+	}
+	var existingCount int64
+	if err := tx.WithContext(ctx).Model(&model.SysRole{}).Where("id IN ?", roleIDs).Count(&existingCount).Error; err != nil {
+		return err
+	}
+	if existingCount != int64(len(roleIDs)) {
+		return service.ErrInvalidRBACInput
+	}
+	return nil
+}
+
+func replaceUserRoles(ctx context.Context, tx *gorm.DB, userID uint, roleIDs []uint) error {
+	if err := tx.WithContext(ctx).Where("user_id = ?", userID).Delete(&model.SysUserRole{}).Error; err != nil {
+		return err
+	}
+	for _, roleID := range roleIDs {
+		if err := tx.WithContext(ctx).Create(&model.SysUserRole{
+			UserID: userID,
+			RoleID: roleID,
+		}).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func mapRoleWriteError(err error) error {
 	if err == nil {
 		return nil
@@ -262,4 +424,43 @@ func mapRoleWriteError(err error) error {
 		return service.ErrRoleCodeExists
 	}
 	return err
+}
+
+func mapUserWriteError(err error) error {
+	if err == nil {
+		return nil
+	}
+	lower := strings.ToLower(err.Error())
+	if strings.Contains(lower, "username") &&
+		(strings.Contains(lower, "duplicate") || strings.Contains(lower, "unique") || strings.Contains(lower, "constraint failed")) {
+		return service.ErrUsernameExists
+	}
+	return err
+}
+
+func adminUserToService(record *model.SysUser, roles []service.Role) *service.AdminUser {
+	roleIDs := make([]uint, 0, len(roles))
+	for _, role := range roles {
+		roleIDs = append(roleIDs, role.ID)
+	}
+	return &service.AdminUser{
+		ID:       record.ID,
+		Username: record.Username,
+		Nickname: record.Nickname,
+		Remark:   record.Remark,
+		RoleIDs:  roleIDs,
+		Roles:    roles,
+	}
+}
+
+func rolesToService(records []model.SysRole) []service.Role {
+	roles := make([]service.Role, 0, len(records))
+	for _, record := range records {
+		roles = append(roles, service.Role{
+			ID:   record.ID,
+			Code: record.Code,
+			Name: record.Name,
+		})
+	}
+	return roles
 }

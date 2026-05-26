@@ -141,6 +141,95 @@ func TestRBACServiceDeleteRoleRejectsEmptyIDs(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidRBACInput)
 }
 
+func TestRBACServiceCreateUserNormalizesHashesPasswordAndDeduplicatesRoles(t *testing.T) {
+	repo := &memoryRBACRepository{}
+	svc := NewRBACService(repo)
+
+	user, err := svc.CreateUser(context.Background(), AdminUserInput{
+		Username: " alice ",
+		Password: "secret123",
+		Nickname: " Alice ",
+		Remark:   " reviewer ",
+		RoleIDs:  []uint{2, 1, 2, 0},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "alice", repo.createdUser.Username)
+	require.Equal(t, "Alice", repo.createdUser.Nickname)
+	require.Equal(t, "reviewer", repo.createdUser.Remark)
+	require.Equal(t, []uint{2, 1}, repo.createdUser.RoleIDs)
+	require.NotEqual(t, "secret123", repo.createdUser.PasswordHash)
+	require.True(t, CheckPassword(repo.createdUser.PasswordHash, "secret123"))
+	require.Equal(t, repo.adminUser, user)
+}
+
+func TestRBACServiceUpdateUserAllowsBlankPasswordAndNormalizesSearch(t *testing.T) {
+	repo := &memoryRBACRepository{}
+	svc := NewRBACService(repo)
+
+	user, err := svc.UpdateUser(context.Background(), 7, AdminUserInput{
+		Username: " alice ",
+		Password: " ",
+		Nickname: " Alice ",
+		Remark:   " reviewer ",
+		RoleIDs:  []uint{1, 1},
+	})
+	require.NoError(t, err)
+	require.Equal(t, uint(7), repo.updatedUserID)
+	require.Empty(t, repo.updatedUser.PasswordHash)
+	require.Equal(t, []uint{1}, repo.updatedUser.RoleIDs)
+	require.Equal(t, repo.adminUser, user)
+
+	page, err := svc.SearchUsers(context.Background(), AdminUserSearchQuery{
+		Keyword: " Alice ",
+		Page:    0,
+		Size:    999,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "Alice", repo.userSearch.Keyword)
+	require.Equal(t, 1, repo.userSearch.Page)
+	require.Equal(t, 200, repo.userSearch.Size)
+	require.Equal(t, repo.adminUserPage, page)
+}
+
+func TestRBACServiceUpdateUserAllowsBlankUsername(t *testing.T) {
+	repo := &memoryRBACRepository{}
+	svc := NewRBACService(repo)
+
+	_, err := svc.UpdateUser(context.Background(), 7, AdminUserInput{
+		Password: "secret123",
+		RoleIDs:  []uint{1},
+	})
+
+	require.NoError(t, err)
+	require.Empty(t, repo.updatedUser.Username)
+	require.NotEmpty(t, repo.updatedUser.PasswordHash)
+}
+
+func TestRBACServiceRejectsInvalidUserInput(t *testing.T) {
+	svc := NewRBACService(&memoryRBACRepository{})
+
+	_, err := svc.CreateUser(context.Background(), AdminUserInput{
+		Username: "alice",
+		Password: "short",
+		RoleIDs:  []uint{1},
+	})
+	require.ErrorIs(t, err, ErrInvalidRBACInput)
+
+	_, err = svc.CreateUser(context.Background(), AdminUserInput{
+		Username: "alice",
+		Password: "secret123",
+		RoleIDs:  []uint{},
+	})
+	require.ErrorIs(t, err, ErrInvalidRBACInput)
+
+	_, err = svc.UpdateUser(context.Background(), 0, AdminUserInput{
+		Username: "alice",
+		RoleIDs:  []uint{1},
+	})
+	require.ErrorIs(t, err, ErrInvalidRBACInput)
+}
+
 type memoryUserRepository struct {
 	byID       map[uint]*User
 	byUsername map[string]*User
@@ -182,6 +271,12 @@ type memoryRBACRepository struct {
 	updated          RoleInput
 	deletedIDs       []uint
 	roleDetail       *RoleDetail
+	createdUser      AdminUserInput
+	updatedUserID    uint
+	updatedUser      AdminUserInput
+	userSearch       AdminUserSearchQuery
+	adminUser        *AdminUser
+	adminUserPage    *AdminUserPage
 }
 
 func (r *memoryRBACRepository) ListRoles(ctx context.Context) ([]Role, error) {
@@ -219,4 +314,40 @@ func (r *memoryRBACRepository) FindRoleByID(ctx context.Context, id uint) (*Role
 func (r *memoryRBACRepository) DeleteRoles(ctx context.Context, ids []uint) error {
 	r.deletedIDs = ids
 	return nil
+}
+
+func (r *memoryRBACRepository) CreateUser(ctx context.Context, input AdminUserInput) (*AdminUser, error) {
+	r.createdUser = input
+	if r.adminUser == nil {
+		r.adminUser = &AdminUser{ID: 1, Username: input.Username, Nickname: input.Nickname, Remark: input.Remark, RoleIDs: input.RoleIDs}
+	}
+	return r.adminUser, nil
+}
+
+func (r *memoryRBACRepository) UpdateUser(ctx context.Context, id uint, input AdminUserInput) (*AdminUser, error) {
+	r.updatedUserID = id
+	r.updatedUser = input
+	if r.adminUser == nil {
+		r.adminUser = &AdminUser{ID: id, Username: input.Username, Nickname: input.Nickname, Remark: input.Remark, RoleIDs: input.RoleIDs}
+	}
+	return r.adminUser, nil
+}
+
+func (r *memoryRBACRepository) FindAdminUserByID(ctx context.Context, id uint) (*AdminUser, error) {
+	if r.adminUser == nil {
+		return nil, ErrUserNotFound
+	}
+	return r.adminUser, nil
+}
+
+func (r *memoryRBACRepository) SearchUsers(ctx context.Context, query AdminUserSearchQuery) (*AdminUserPage, error) {
+	r.userSearch = query
+	if r.adminUserPage == nil {
+		r.adminUserPage = &AdminUserPage{Items: []AdminUser{}, Page: query.Page, Size: query.Size}
+	}
+	return r.adminUserPage, nil
+}
+
+func (r *memoryRBACRepository) ListRoleOptions(ctx context.Context) ([]Role, error) {
+	return r.roles, nil
 }

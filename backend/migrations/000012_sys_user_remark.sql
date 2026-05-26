@@ -1,0 +1,2 @@
+ALTER TABLE sys_user
+  ADD COLUMN remark VARCHAR(255) NOT NULL DEFAULT '' AFTER nickname;

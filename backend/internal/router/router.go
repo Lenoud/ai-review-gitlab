@@ -79,12 +79,6 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 
 		{http.MethodPost, "/project-analysis-plan-execution-log/test-run", "project-analysis-plan:write"},
 
-		{http.MethodPost, "/user/create", "rbac:write"},
-		{http.MethodPost, "/user/update", "rbac:write"},
-		{http.MethodGet, "/user/get", "rbac:read"},
-		{http.MethodGet, "/user/search", "rbac:read"},
-		{http.MethodGet, "/user/role-options", "rbac:read"},
-
 		{http.MethodGet, "/stats", "stats:read"},
 		{http.MethodGet, "/member/commit-summary", "stats:read"},
 		{http.MethodGet, "/sys-log/get", "sys-log:read"},
@@ -144,6 +138,11 @@ func registerAnalysisExecutionLogRoutes(group *gin.RouterGroup, analysisLogHandl
 }
 
 func registerRBACRoutes(group *gin.RouterGroup, rbacHandler *handler.RBACHandler) {
+	group.POST("/user/create", middleware.RequirePermission("rbac:write"), rbacHandler.CreateUser)
+	group.POST("/user/update", middleware.RequirePermission("rbac:write"), rbacHandler.UpdateUser)
+	group.GET("/user/get", middleware.RequirePermission("rbac:read"), rbacHandler.GetUser)
+	group.GET("/user/search", middleware.RequirePermission("rbac:read"), rbacHandler.SearchUsers)
+	group.GET("/user/role-options", middleware.RequirePermission("rbac:read"), rbacHandler.RoleOptions)
 	group.GET("/role/list", middleware.RequirePermission("rbac:read"), rbacHandler.ListRoles)
 	group.POST("/role/create", middleware.RequirePermission("rbac:write"), rbacHandler.CreateRole)
 	group.POST("/role/update", middleware.RequirePermission("rbac:write"), rbacHandler.UpdateRole)

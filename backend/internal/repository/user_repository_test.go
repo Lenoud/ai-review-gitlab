@@ -246,6 +246,150 @@ func TestUserRepositoryRejectsDeletingMissingRole(t *testing.T) {
 	require.ErrorIs(t, err, service.ErrRoleNotFound)
 }
 
+func TestUserRepositoryCreatesAdminUserWithRoles(t *testing.T) {
+	db := openUserRepositoryTestDB(t)
+	admin := model.SysRole{Code: "admin", Name: "管理员"}
+	reviewer := model.SysRole{Code: "reviewer", Name: "审查员"}
+	require.NoError(t, db.Create(&admin).Error)
+	require.NoError(t, db.Create(&reviewer).Error)
+	repo := NewUserRepository(db)
+
+	user, err := repo.CreateUser(context.Background(), service.AdminUserInput{
+		Username:     "alice",
+		PasswordHash: "hashed-password",
+		Nickname:     "Alice",
+		Remark:       "team lead",
+		RoleIDs:      []uint{reviewer.ID, admin.ID},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "alice", user.Username)
+	require.Equal(t, "Alice", user.Nickname)
+	require.Equal(t, "team lead", user.Remark)
+	require.ElementsMatch(t, []uint{admin.ID, reviewer.ID}, user.RoleIDs)
+	require.ElementsMatch(t, []service.Role{
+		{ID: admin.ID, Code: "admin", Name: "管理员"},
+		{ID: reviewer.ID, Code: "reviewer", Name: "审查员"},
+	}, user.Roles)
+	var record model.SysUser
+	require.NoError(t, db.First(&record, user.ID).Error)
+	require.Equal(t, "hashed-password", record.PasswordHash)
+}
+
+func TestUserRepositoryUpdatesAdminUserAndPreservesPasswordWhenBlank(t *testing.T) {
+	db := openUserRepositoryTestDB(t)
+	user := model.SysUser{Username: "alice", PasswordHash: "old-hash", Nickname: "Alice", Status: service.UserStatusEnabled}
+	oldRole := model.SysRole{Code: "reviewer", Name: "审查员"}
+	newRole := model.SysRole{Code: "admin", Name: "管理员"}
+	require.NoError(t, db.Create(&user).Error)
+	require.NoError(t, db.Create(&oldRole).Error)
+	require.NoError(t, db.Create(&newRole).Error)
+	require.NoError(t, db.Create(&model.SysUserRole{UserID: user.ID, RoleID: oldRole.ID}).Error)
+	repo := NewUserRepository(db)
+
+	got, err := repo.UpdateUser(context.Background(), user.ID, service.AdminUserInput{
+		Username: "alice2",
+		Nickname: "Alice Liddell",
+		Remark:   "new remark",
+		RoleIDs:  []uint{newRole.ID},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "alice2", got.Username)
+	require.Equal(t, []uint{newRole.ID}, got.RoleIDs)
+	var record model.SysUser
+	require.NoError(t, db.First(&record, user.ID).Error)
+	require.Equal(t, "old-hash", record.PasswordHash)
+	require.Equal(t, "new remark", record.Remark)
+}
+
+func TestUserRepositoryUpdateAdminUserPreservesUsernameWhenBlank(t *testing.T) {
+	db := openUserRepositoryTestDB(t)
+	user := model.SysUser{Username: "alice", PasswordHash: "old-hash", Nickname: "Alice", Status: service.UserStatusEnabled}
+	role := model.SysRole{Code: "reviewer", Name: "审查员"}
+	require.NoError(t, db.Create(&user).Error)
+	require.NoError(t, db.Create(&role).Error)
+	repo := NewUserRepository(db)
+
+	got, err := repo.UpdateUser(context.Background(), user.ID, service.AdminUserInput{
+		Nickname:     "Alice Liddell",
+		PasswordHash: "new-hash",
+		RoleIDs:      []uint{role.ID},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "alice", got.Username)
+	var record model.SysUser
+	require.NoError(t, db.First(&record, user.ID).Error)
+	require.Equal(t, "alice", record.Username)
+	require.Equal(t, "new-hash", record.PasswordHash)
+}
+
+func TestUserRepositorySearchesAdminUsersWithRoles(t *testing.T) {
+	db := openUserRepositoryTestDB(t)
+	adminRole := model.SysRole{Code: "admin", Name: "管理员"}
+	reviewerRole := model.SysRole{Code: "reviewer", Name: "审查员"}
+	alice := model.SysUser{Username: "alice", PasswordHash: "hash", Nickname: "Alice", Status: service.UserStatusEnabled}
+	bob := model.SysUser{Username: "bob", PasswordHash: "hash", Nickname: "Builder", Status: service.UserStatusEnabled}
+	require.NoError(t, db.Create(&adminRole).Error)
+	require.NoError(t, db.Create(&reviewerRole).Error)
+	require.NoError(t, db.Create(&alice).Error)
+	require.NoError(t, db.Create(&bob).Error)
+	require.NoError(t, db.Create(&model.SysUserRole{UserID: alice.ID, RoleID: reviewerRole.ID}).Error)
+	require.NoError(t, db.Create(&model.SysUserRole{UserID: bob.ID, RoleID: adminRole.ID}).Error)
+	repo := NewUserRepository(db)
+
+	page, err := repo.SearchUsers(context.Background(), service.AdminUserSearchQuery{
+		Keyword: "ali",
+		Page:    1,
+		Size:    20,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, int64(1), page.Total)
+	require.Len(t, page.Items, 1)
+	require.Equal(t, "alice", page.Items[0].Username)
+	require.Equal(t, []uint{reviewerRole.ID}, page.Items[0].RoleIDs)
+	require.Equal(t, []service.Role{{ID: reviewerRole.ID, Code: "reviewer", Name: "审查员"}}, page.Items[0].Roles)
+}
+
+func TestUserRepositoryRejectsDuplicateUsernameAndUnknownRole(t *testing.T) {
+	db := openUserRepositoryTestDB(t)
+	role := model.SysRole{Code: "reviewer", Name: "审查员"}
+	require.NoError(t, db.Create(&model.SysUser{Username: "alice", PasswordHash: "hash", Status: service.UserStatusEnabled}).Error)
+	require.NoError(t, db.Create(&role).Error)
+	repo := NewUserRepository(db)
+
+	_, err := repo.CreateUser(context.Background(), service.AdminUserInput{
+		Username:     "alice",
+		PasswordHash: "new-hash",
+		RoleIDs:      []uint{role.ID},
+	})
+	require.ErrorIs(t, err, service.ErrUsernameExists)
+
+	_, err = repo.CreateUser(context.Background(), service.AdminUserInput{
+		Username:     "bob",
+		PasswordHash: "new-hash",
+		RoleIDs:      []uint{999},
+	})
+	require.ErrorIs(t, err, service.ErrInvalidRBACInput)
+}
+
+func TestUserRepositoryListsRoleOptionsInCodeOrder(t *testing.T) {
+	db := openUserRepositoryTestDB(t)
+	require.NoError(t, db.Create(&model.SysRole{Code: "reviewer", Name: "审查员"}).Error)
+	require.NoError(t, db.Create(&model.SysRole{Code: "admin", Name: "管理员"}).Error)
+	repo := NewUserRepository(db)
+
+	roles, err := repo.ListRoleOptions(context.Background())
+
+	require.NoError(t, err)
+	require.Equal(t, []service.Role{
+		{ID: 2, Code: "admin", Name: "管理员"},
+		{ID: 1, Code: "reviewer", Name: "审查员"},
+	}, roles)
+}
+
 func openUserRepositoryTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 

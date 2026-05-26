@@ -161,6 +161,13 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 			"/api/v1/admin/role/get",
 			"/api/v1/admin/role/delete":
 			expectedStatus = http.StatusBadRequest
+		case "/api/v1/admin/user/create",
+			"/api/v1/admin/user/update",
+			"/api/v1/admin/user/get":
+			expectedStatus = http.StatusBadRequest
+		case "/api/v1/admin/user/search",
+			"/api/v1/admin/user/role-options":
+			expectedStatus = http.StatusOK
 		case "/api/v1/admin/project/create",
 			"/api/v1/admin/project/batch-create",
 			"/api/v1/admin/project/update",
@@ -375,6 +382,26 @@ func (s *contractRBACService) GetRole(ctx context.Context, id uint) (*service.Ro
 
 func (s *contractRBACService) DeleteRoles(ctx context.Context, ids []uint) error {
 	return service.ErrInvalidRBACInput
+}
+
+func (s *contractRBACService) CreateUser(ctx context.Context, input service.AdminUserInput) (*service.AdminUser, error) {
+	return nil, service.ErrInvalidRBACInput
+}
+
+func (s *contractRBACService) UpdateUser(ctx context.Context, id uint, input service.AdminUserInput) (*service.AdminUser, error) {
+	return nil, service.ErrInvalidRBACInput
+}
+
+func (s *contractRBACService) GetUser(ctx context.Context, id uint) (*service.AdminUser, error) {
+	return nil, service.ErrInvalidRBACInput
+}
+
+func (s *contractRBACService) SearchUsers(ctx context.Context, query service.AdminUserSearchQuery) (*service.AdminUserPage, error) {
+	return &service.AdminUserPage{Items: []service.AdminUser{}, Page: query.Page, Size: query.Size}, nil
+}
+
+func (s *contractRBACService) ListRoleOptions(ctx context.Context) ([]service.Role, error) {
+	return []service.Role{}, nil
 }
 
 type contractProjectService struct{}
