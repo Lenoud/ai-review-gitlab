@@ -84,10 +84,6 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 		{http.MethodGet, "/user/get", "rbac:read"},
 		{http.MethodGet, "/user/search", "rbac:read"},
 		{http.MethodGet, "/user/role-options", "rbac:read"},
-		{http.MethodPost, "/role/create", "rbac:write"},
-		{http.MethodPost, "/role/update", "rbac:write"},
-		{http.MethodGet, "/role/get", "rbac:read"},
-		{http.MethodPost, "/role/delete", "rbac:write"},
 
 		{http.MethodGet, "/stats", "stats:read"},
 		{http.MethodGet, "/member/commit-summary", "stats:read"},
@@ -149,6 +145,10 @@ func registerAnalysisExecutionLogRoutes(group *gin.RouterGroup, analysisLogHandl
 
 func registerRBACRoutes(group *gin.RouterGroup, rbacHandler *handler.RBACHandler) {
 	group.GET("/role/list", middleware.RequirePermission("rbac:read"), rbacHandler.ListRoles)
+	group.POST("/role/create", middleware.RequirePermission("rbac:write"), rbacHandler.CreateRole)
+	group.POST("/role/update", middleware.RequirePermission("rbac:write"), rbacHandler.UpdateRole)
+	group.GET("/role/get", middleware.RequirePermission("rbac:read"), rbacHandler.GetRole)
+	group.POST("/role/delete", middleware.RequirePermission("rbac:write"), rbacHandler.DeleteRole)
 	group.GET("/role/menu-permissions", middleware.RequirePermission("rbac:read"), rbacHandler.MenuPermissions)
 }
 

@@ -156,6 +156,11 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 		case "/api/v1/admin/role/list",
 			"/api/v1/admin/role/menu-permissions":
 			expectedStatus = http.StatusOK
+		case "/api/v1/admin/role/create",
+			"/api/v1/admin/role/update",
+			"/api/v1/admin/role/get",
+			"/api/v1/admin/role/delete":
+			expectedStatus = http.StatusBadRequest
 		case "/api/v1/admin/project/create",
 			"/api/v1/admin/project/batch-create",
 			"/api/v1/admin/project/update",
@@ -354,6 +359,22 @@ func (s *contractRBACService) ListRoles(ctx context.Context) ([]service.Role, er
 
 func (s *contractRBACService) ListPermissionGroups(ctx context.Context) ([]service.PermissionGroup, error) {
 	return []service.PermissionGroup{}, nil
+}
+
+func (s *contractRBACService) CreateRole(ctx context.Context, input service.RoleInput) (*service.RoleDetail, error) {
+	return nil, service.ErrInvalidRBACInput
+}
+
+func (s *contractRBACService) UpdateRole(ctx context.Context, id uint, input service.RoleInput) (*service.RoleDetail, error) {
+	return nil, service.ErrInvalidRBACInput
+}
+
+func (s *contractRBACService) GetRole(ctx context.Context, id uint) (*service.RoleDetail, error) {
+	return nil, service.ErrInvalidRBACInput
+}
+
+func (s *contractRBACService) DeleteRoles(ctx context.Context, ids []uint) error {
+	return service.ErrInvalidRBACInput
 }
 
 type contractProjectService struct{}
