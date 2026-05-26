@@ -72,6 +72,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&model.ProjectAnalysisPlanExecutionLog{},
 		&model.AIReviewTrace{},
 		&model.IMRobot{},
+		&model.MemberIMMapping{},
 		&model.ProjectTemplate{},
 		&model.ProjectTemplateReviewRule{},
 	)

@@ -26,6 +26,7 @@ type Dependencies struct {
 	AnalysisLogHandler               *handler.AnalysisExecutionLogHandler
 	AIReviewTraceHandler             *handler.AIReviewTraceHandler
 	IMRobotHandler                   *handler.IMRobotHandler
+	MemberIMMappingHandler           *handler.MemberIMMappingHandler
 	OpenReportHandler                *handler.OpenReportHandler
 	WebhookHandler                   *handler.WebhookHandler
 	RBACHandler                      *handler.RBACHandler
@@ -71,15 +72,10 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 	registerAnalysisExecutionLogRoutes(admin, deps.AnalysisLogHandler)
 	registerAIReviewTraceRoutes(admin, deps.AIReviewTraceHandler)
 	registerIMRobotRoutes(admin, deps.IMRobotHandler)
+	registerMemberIMMappingRoutes(admin, deps.MemberIMMappingHandler)
 	registerRBACRoutes(admin, deps.RBACHandler)
 	registerRoutes(admin, []routeDef{
 		{http.MethodPost, "/im-robot/test-webhook", "im-robot:write"},
-
-		{http.MethodPost, "/member-im-mapping/create", "member-im-mapping:write"},
-		{http.MethodPost, "/member-im-mapping/update", "member-im-mapping:write"},
-		{http.MethodGet, "/member-im-mapping/get", "member-im-mapping:read"},
-		{http.MethodPost, "/member-im-mapping/delete", "member-im-mapping:write"},
-		{http.MethodGet, "/member-im-mapping/search", "member-im-mapping:read"},
 
 		{http.MethodPost, "/project-analysis-plan-execution-log/test-run", "project-analysis-plan:write"},
 
@@ -101,6 +97,14 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 		{http.MethodGet, "/system/config", "system:read"},
 		{http.MethodPost, "/system/config/base-url", "system:write"},
 	})
+}
+
+func registerMemberIMMappingRoutes(group *gin.RouterGroup, mappingHandler *handler.MemberIMMappingHandler) {
+	group.POST("/member-im-mapping/create", middleware.RequirePermission("member-im-mapping:write"), mappingHandler.Create)
+	group.POST("/member-im-mapping/update", middleware.RequirePermission("member-im-mapping:write"), mappingHandler.Update)
+	group.GET("/member-im-mapping/get", middleware.RequirePermission("member-im-mapping:read"), mappingHandler.Get)
+	group.POST("/member-im-mapping/delete", middleware.RequirePermission("member-im-mapping:write"), mappingHandler.Delete)
+	group.GET("/member-im-mapping/search", middleware.RequirePermission("member-im-mapping:read"), mappingHandler.Search)
 }
 
 func registerIMRobotRoutes(group *gin.RouterGroup, imRobotHandler *handler.IMRobotHandler) {

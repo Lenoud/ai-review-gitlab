@@ -189,6 +189,13 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 		case "/api/v1/admin/im-robot/search",
 			"/api/v1/admin/im-robot/list-enabled":
 			expectedStatus = http.StatusOK
+		case "/api/v1/admin/member-im-mapping/create",
+			"/api/v1/admin/member-im-mapping/update",
+			"/api/v1/admin/member-im-mapping/get",
+			"/api/v1/admin/member-im-mapping/delete":
+			expectedStatus = http.StatusBadRequest
+		case "/api/v1/admin/member-im-mapping/search":
+			expectedStatus = http.StatusOK
 		case "/api/v1/admin/push-review-log/get",
 			"/api/v1/admin/merge-request-review-log/get",
 			"/api/v1/admin/review-log/get-share-token",
@@ -255,6 +262,7 @@ func TestAdminProtectedRoutesReturnForbiddenWithoutPermission(t *testing.T) {
 		AnalysisLogHandler:               handler.NewAnalysisExecutionLogHandler(&contractAnalysisExecutionLogService{}),
 		AIReviewTraceHandler:             handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
 		IMRobotHandler:                   handler.NewIMRobotHandler(&contractIMRobotService{}),
+		MemberIMMappingHandler:           handler.NewMemberIMMappingHandler(&contractMemberIMMappingService{}),
 		OpenReportHandler:                handler.NewOpenReportHandler(&contractOpenReportService{}),
 		RBACHandler:                      handler.NewRBACHandler(&contractRBACService{}),
 		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
@@ -287,6 +295,7 @@ func newContractRouter() *gin.Engine {
 		AnalysisLogHandler:               handler.NewAnalysisExecutionLogHandler(&contractAnalysisExecutionLogService{}),
 		AIReviewTraceHandler:             handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
 		IMRobotHandler:                   handler.NewIMRobotHandler(&contractIMRobotService{}),
+		MemberIMMappingHandler:           handler.NewMemberIMMappingHandler(&contractMemberIMMappingService{}),
 		OpenReportHandler:                handler.NewOpenReportHandler(&contractOpenReportService{}),
 		RBACHandler:                      handler.NewRBACHandler(&contractRBACService{}),
 		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
@@ -536,6 +545,28 @@ func (s *contractIMRobotService) Search(ctx context.Context, query service.IMRob
 
 func (s *contractIMRobotService) ListEnabled(ctx context.Context) ([]service.IMRobot, error) {
 	return []service.IMRobot{}, nil
+}
+
+type contractMemberIMMappingService struct{}
+
+func (s *contractMemberIMMappingService) Create(ctx context.Context, input service.MemberIMMappingInput) (*service.MemberIMMapping, error) {
+	return nil, service.ErrInvalidMemberIMMappingInput
+}
+
+func (s *contractMemberIMMappingService) Update(ctx context.Context, id uint, input service.MemberIMMappingInput) (*service.MemberIMMapping, error) {
+	return nil, service.ErrInvalidMemberIMMappingInput
+}
+
+func (s *contractMemberIMMappingService) Get(ctx context.Context, id uint) (*service.MemberIMMapping, error) {
+	return nil, service.ErrInvalidMemberIMMappingInput
+}
+
+func (s *contractMemberIMMappingService) Delete(ctx context.Context, ids []uint) error {
+	return service.ErrInvalidMemberIMMappingInput
+}
+
+func (s *contractMemberIMMappingService) Search(ctx context.Context, query service.MemberIMMappingSearchQuery) (*service.MemberIMMappingPage, error) {
+	return &service.MemberIMMappingPage{Items: []service.MemberIMMapping{}, Total: 0, Page: 1, Size: 20}, nil
 }
 
 type contractReviewLogService struct{}
