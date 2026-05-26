@@ -63,7 +63,12 @@ func (r *ProjectTemplateRepository) FindProjectTemplateByID(ctx context.Context,
 }
 
 func (r *ProjectTemplateRepository) DeleteProjectTemplates(ctx context.Context, ids []uint) error {
-	return r.db.WithContext(ctx).Delete(&model.ProjectTemplate{}, ids).Error
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("template_id IN ?", ids).Delete(&model.ProjectTemplateReviewRule{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&model.ProjectTemplate{}, ids).Error
+	})
 }
 
 func (r *ProjectTemplateRepository) ListProjectTemplates(ctx context.Context, query service.ProjectTemplateListQuery) ([]service.ProjectTemplate, error) {

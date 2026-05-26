@@ -58,6 +58,7 @@ func main() {
 
 	projectSvc := service.NewProjectService(repository.NewProjectRepository(db))
 	projectTemplateSvc := service.NewProjectTemplateService(repository.NewProjectTemplateRepository(db))
+	projectTemplateReviewRuleSvc := service.NewProjectTemplateReviewRuleService(repository.NewProjectTemplateReviewRuleRepository(db))
 	analysisPlanSvc := service.NewProjectAnalysisPlanService(repository.NewProjectAnalysisPlanRepository(db))
 	gitLabSvc := service.NewGitLabService(platformgitlab.NewServiceAdapter(nil))
 	reviewTaskSvc := service.NewReviewTaskService(repository.NewProjectRepository(db), repository.NewReviewTaskRepository(db), service.ReviewTaskOptions{})
@@ -105,6 +106,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(authSvc)
 	projectHandler := handler.NewProjectHandler(projectSvc)
 	projectTemplateHandler := handler.NewProjectTemplateHandler(projectTemplateSvc)
+	projectTemplateReviewRuleHandler := handler.NewProjectTemplateReviewRuleHandler(projectTemplateReviewRuleSvc)
 	analysisPlanHandler := handler.NewProjectAnalysisPlanHandler(analysisPlanSvc)
 	projectGitLabHandler := handler.NewProjectGitLabHandler(gitLabSvc)
 	llmModelHandler := handler.NewLLMModelHandler(llmModelSvc)
@@ -115,19 +117,20 @@ func main() {
 	webhookHandler := handler.NewWebhookHandler(reviewTaskSvc)
 	rbacHandler := handler.NewRBACHandler(rbacSvc)
 	r := router.New(router.Dependencies{
-		AuthHandler:            authHandler,
-		ProjectHandler:         projectHandler,
-		ProjectGitLabHandler:   projectGitLabHandler,
-		ProjectTemplateHandler: projectTemplateHandler,
-		AnalysisPlanHandler:    analysisPlanHandler,
-		LLMModelHandler:        llmModelHandler,
-		ReviewLogHandler:       reviewLogHandler,
-		AnalysisLogHandler:     analysisLogHandler,
-		AIReviewTraceHandler:   aiReviewTraceHandler,
-		OpenReportHandler:      openReportHandler,
-		WebhookHandler:         webhookHandler,
-		RBACHandler:            rbacHandler,
-		AuthMiddleware:         middleware.JWTAuth(authSvc),
+		AuthHandler:                      authHandler,
+		ProjectHandler:                   projectHandler,
+		ProjectGitLabHandler:             projectGitLabHandler,
+		ProjectTemplateHandler:           projectTemplateHandler,
+		ProjectTemplateReviewRuleHandler: projectTemplateReviewRuleHandler,
+		AnalysisPlanHandler:              analysisPlanHandler,
+		LLMModelHandler:                  llmModelHandler,
+		ReviewLogHandler:                 reviewLogHandler,
+		AnalysisLogHandler:               analysisLogHandler,
+		AIReviewTraceHandler:             aiReviewTraceHandler,
+		OpenReportHandler:                openReportHandler,
+		WebhookHandler:                   webhookHandler,
+		RBACHandler:                      rbacHandler,
+		AuthMiddleware:                   middleware.JWTAuth(authSvc),
 	})
 	if err := r.Run(cfg.Server.Address()); err != nil {
 		log.Fatalf("run server: %v", err)

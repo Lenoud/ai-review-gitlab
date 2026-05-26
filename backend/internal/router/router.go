@@ -15,19 +15,20 @@ type routeDef struct {
 }
 
 type Dependencies struct {
-	AuthHandler            *handler.AuthHandler
-	ProjectHandler         *handler.ProjectHandler
-	ProjectGitLabHandler   *handler.ProjectGitLabHandler
-	ProjectTemplateHandler *handler.ProjectTemplateHandler
-	AnalysisPlanHandler    *handler.ProjectAnalysisPlanHandler
-	LLMModelHandler        *handler.LLMModelHandler
-	ReviewLogHandler       *handler.ReviewLogHandler
-	AnalysisLogHandler     *handler.AnalysisExecutionLogHandler
-	AIReviewTraceHandler   *handler.AIReviewTraceHandler
-	OpenReportHandler      *handler.OpenReportHandler
-	WebhookHandler         *handler.WebhookHandler
-	RBACHandler            *handler.RBACHandler
-	AuthMiddleware         gin.HandlerFunc
+	AuthHandler                      *handler.AuthHandler
+	ProjectHandler                   *handler.ProjectHandler
+	ProjectGitLabHandler             *handler.ProjectGitLabHandler
+	ProjectTemplateHandler           *handler.ProjectTemplateHandler
+	ProjectTemplateReviewRuleHandler *handler.ProjectTemplateReviewRuleHandler
+	AnalysisPlanHandler              *handler.ProjectAnalysisPlanHandler
+	LLMModelHandler                  *handler.LLMModelHandler
+	ReviewLogHandler                 *handler.ReviewLogHandler
+	AnalysisLogHandler               *handler.AnalysisExecutionLogHandler
+	AIReviewTraceHandler             *handler.AIReviewTraceHandler
+	OpenReportHandler                *handler.OpenReportHandler
+	WebhookHandler                   *handler.WebhookHandler
+	RBACHandler                      *handler.RBACHandler
+	AuthMiddleware                   gin.HandlerFunc
 }
 
 func New(deps Dependencies) *gin.Engine {
@@ -62,6 +63,7 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 	registerProjectRoutes(admin, deps.ProjectHandler)
 	registerProjectGitLabRoutes(admin, deps.ProjectGitLabHandler)
 	registerProjectTemplateRoutes(admin, deps.ProjectTemplateHandler)
+	registerProjectTemplateReviewRuleRoutes(admin, deps.ProjectTemplateReviewRuleHandler)
 	registerProjectAnalysisPlanRoutes(admin, deps.AnalysisPlanHandler)
 	registerLLMModelRoutes(admin, deps.LLMModelHandler)
 	registerReviewLogRoutes(admin, deps.ReviewLogHandler)
@@ -82,12 +84,6 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 		{http.MethodGet, "/member-im-mapping/get", "member-im-mapping:read"},
 		{http.MethodPost, "/member-im-mapping/delete", "member-im-mapping:write"},
 		{http.MethodGet, "/member-im-mapping/search", "member-im-mapping:read"},
-
-		{http.MethodGet, "/project-template/review-rule/list-by-template-id", "project-template:read"},
-		{http.MethodPost, "/project-template/review-rule/create", "project-template:write"},
-		{http.MethodPost, "/project-template/review-rule/update", "project-template:write"},
-		{http.MethodGet, "/project-template/review-rule/get", "project-template:read"},
-		{http.MethodPost, "/project-template/review-rule/delete", "project-template:write"},
 
 		{http.MethodPost, "/project-analysis-plan-execution-log/test-run", "project-analysis-plan:write"},
 
@@ -117,6 +113,14 @@ func registerProjectTemplateRoutes(group *gin.RouterGroup, templateHandler *hand
 	group.GET("/project-template/get", middleware.RequirePermission("project-template:read"), templateHandler.Get)
 	group.GET("/project-template/list", middleware.RequirePermission("project-template:read"), templateHandler.List)
 	group.POST("/project-template/delete", middleware.RequirePermission("project-template:write"), templateHandler.Delete)
+}
+
+func registerProjectTemplateReviewRuleRoutes(group *gin.RouterGroup, ruleHandler *handler.ProjectTemplateReviewRuleHandler) {
+	group.GET("/project-template/review-rule/list-by-template-id", middleware.RequirePermission("project-template:read"), ruleHandler.ListByTemplateID)
+	group.POST("/project-template/review-rule/create", middleware.RequirePermission("project-template:write"), ruleHandler.Create)
+	group.POST("/project-template/review-rule/update", middleware.RequirePermission("project-template:write"), ruleHandler.Update)
+	group.GET("/project-template/review-rule/get", middleware.RequirePermission("project-template:read"), ruleHandler.Get)
+	group.POST("/project-template/review-rule/delete", middleware.RequirePermission("project-template:write"), ruleHandler.Delete)
 }
 
 func registerProjectAnalysisPlanRoutes(group *gin.RouterGroup, analysisPlanHandler *handler.ProjectAnalysisPlanHandler) {

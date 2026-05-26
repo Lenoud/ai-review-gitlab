@@ -72,5 +72,6 @@ func AutoMigrate(db *gorm.DB) error {
 		&model.ProjectAnalysisPlanExecutionLog{},
 		&model.AIReviewTrace{},
 		&model.ProjectTemplate{},
+		&model.ProjectTemplateReviewRule{},
 	)
 }

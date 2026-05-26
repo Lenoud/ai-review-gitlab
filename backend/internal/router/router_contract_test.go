@@ -222,6 +222,12 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 			expectedStatus = http.StatusBadRequest
 		case "/api/v1/admin/project-template/list":
 			expectedStatus = http.StatusOK
+		case "/api/v1/admin/project-template/review-rule/create",
+			"/api/v1/admin/project-template/review-rule/update",
+			"/api/v1/admin/project-template/review-rule/get",
+			"/api/v1/admin/project-template/review-rule/list-by-template-id",
+			"/api/v1/admin/project-template/review-rule/delete":
+			expectedStatus = http.StatusBadRequest
 		}
 		require.Equal(t, expectedStatus, w.Code, "%s %s with token", route.method, route.path)
 	}
@@ -230,17 +236,18 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 func TestAdminProtectedRoutesReturnForbiddenWithoutPermission(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := New(Dependencies{
-		AuthHandler:            NewAuthHandlerForTest(),
-		ProjectHandler:         handler.NewProjectHandler(&contractProjectService{}),
-		ProjectGitLabHandler:   handler.NewProjectGitLabHandler(&contractProjectGitLabService{}),
-		ProjectTemplateHandler: handler.NewProjectTemplateHandler(&contractProjectTemplateService{}),
-		AnalysisPlanHandler:    handler.NewProjectAnalysisPlanHandler(&contractProjectAnalysisPlanService{}),
-		LLMModelHandler:        handler.NewLLMModelHandler(&contractLLMModelService{}),
-		ReviewLogHandler:       handler.NewReviewLogHandler(&contractReviewLogService{}),
-		AnalysisLogHandler:     handler.NewAnalysisExecutionLogHandler(&contractAnalysisExecutionLogService{}),
-		AIReviewTraceHandler:   handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
-		OpenReportHandler:      handler.NewOpenReportHandler(&contractOpenReportService{}),
-		RBACHandler:            handler.NewRBACHandler(&contractRBACService{}),
+		AuthHandler:                      NewAuthHandlerForTest(),
+		ProjectHandler:                   handler.NewProjectHandler(&contractProjectService{}),
+		ProjectGitLabHandler:             handler.NewProjectGitLabHandler(&contractProjectGitLabService{}),
+		ProjectTemplateHandler:           handler.NewProjectTemplateHandler(&contractProjectTemplateService{}),
+		ProjectTemplateReviewRuleHandler: handler.NewProjectTemplateReviewRuleHandler(&contractProjectTemplateReviewRuleService{}),
+		AnalysisPlanHandler:              handler.NewProjectAnalysisPlanHandler(&contractProjectAnalysisPlanService{}),
+		LLMModelHandler:                  handler.NewLLMModelHandler(&contractLLMModelService{}),
+		ReviewLogHandler:                 handler.NewReviewLogHandler(&contractReviewLogService{}),
+		AnalysisLogHandler:               handler.NewAnalysisExecutionLogHandler(&contractAnalysisExecutionLogService{}),
+		AIReviewTraceHandler:             handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
+		OpenReportHandler:                handler.NewOpenReportHandler(&contractOpenReportService{}),
+		RBACHandler:                      handler.NewRBACHandler(&contractRBACService{}),
 		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
 			subject: &service.AuthSubject{
 				UserID:   2,
@@ -260,17 +267,18 @@ func TestAdminProtectedRoutesReturnForbiddenWithoutPermission(t *testing.T) {
 
 func newContractRouter() *gin.Engine {
 	return New(Dependencies{
-		AuthHandler:            NewAuthHandlerForTest(),
-		ProjectHandler:         handler.NewProjectHandler(&contractProjectService{}),
-		ProjectGitLabHandler:   handler.NewProjectGitLabHandler(&contractProjectGitLabService{}),
-		ProjectTemplateHandler: handler.NewProjectTemplateHandler(&contractProjectTemplateService{}),
-		AnalysisPlanHandler:    handler.NewProjectAnalysisPlanHandler(&contractProjectAnalysisPlanService{}),
-		LLMModelHandler:        handler.NewLLMModelHandler(&contractLLMModelService{}),
-		ReviewLogHandler:       handler.NewReviewLogHandler(&contractReviewLogService{}),
-		AnalysisLogHandler:     handler.NewAnalysisExecutionLogHandler(&contractAnalysisExecutionLogService{}),
-		AIReviewTraceHandler:   handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
-		OpenReportHandler:      handler.NewOpenReportHandler(&contractOpenReportService{}),
-		RBACHandler:            handler.NewRBACHandler(&contractRBACService{}),
+		AuthHandler:                      NewAuthHandlerForTest(),
+		ProjectHandler:                   handler.NewProjectHandler(&contractProjectService{}),
+		ProjectGitLabHandler:             handler.NewProjectGitLabHandler(&contractProjectGitLabService{}),
+		ProjectTemplateHandler:           handler.NewProjectTemplateHandler(&contractProjectTemplateService{}),
+		ProjectTemplateReviewRuleHandler: handler.NewProjectTemplateReviewRuleHandler(&contractProjectTemplateReviewRuleService{}),
+		AnalysisPlanHandler:              handler.NewProjectAnalysisPlanHandler(&contractProjectAnalysisPlanService{}),
+		LLMModelHandler:                  handler.NewLLMModelHandler(&contractLLMModelService{}),
+		ReviewLogHandler:                 handler.NewReviewLogHandler(&contractReviewLogService{}),
+		AnalysisLogHandler:               handler.NewAnalysisExecutionLogHandler(&contractAnalysisExecutionLogService{}),
+		AIReviewTraceHandler:             handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
+		OpenReportHandler:                handler.NewOpenReportHandler(&contractOpenReportService{}),
+		RBACHandler:                      handler.NewRBACHandler(&contractRBACService{}),
 		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
 			subject: &service.AuthSubject{
 				UserID:   1,
@@ -409,6 +417,28 @@ func (s *contractProjectTemplateService) Delete(ctx context.Context, ids []uint)
 
 func (s *contractProjectTemplateService) List(ctx context.Context, query service.ProjectTemplateListQuery) ([]service.ProjectTemplate, error) {
 	return []service.ProjectTemplate{}, nil
+}
+
+type contractProjectTemplateReviewRuleService struct{}
+
+func (s *contractProjectTemplateReviewRuleService) Create(ctx context.Context, input service.ProjectTemplateReviewRuleInput) (*service.ProjectTemplateReviewRule, error) {
+	return nil, service.ErrInvalidProjectTemplateReviewRuleInput
+}
+
+func (s *contractProjectTemplateReviewRuleService) Update(ctx context.Context, id uint, input service.ProjectTemplateReviewRuleInput) (*service.ProjectTemplateReviewRule, error) {
+	return nil, service.ErrInvalidProjectTemplateReviewRuleInput
+}
+
+func (s *contractProjectTemplateReviewRuleService) Get(ctx context.Context, id uint) (*service.ProjectTemplateReviewRule, error) {
+	return nil, service.ErrInvalidProjectTemplateReviewRuleInput
+}
+
+func (s *contractProjectTemplateReviewRuleService) Delete(ctx context.Context, id uint) error {
+	return service.ErrInvalidProjectTemplateReviewRuleInput
+}
+
+func (s *contractProjectTemplateReviewRuleService) ListByTemplateID(ctx context.Context, templateID uint) ([]service.ProjectTemplateReviewRule, error) {
+	return nil, service.ErrInvalidProjectTemplateReviewRuleInput
 }
 
 type contractProjectAnalysisPlanService struct{}

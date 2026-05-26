@@ -58,6 +58,8 @@ func TestProjectTemplateRepositoryDeletesTemplates(t *testing.T) {
 	db := openProjectTemplateRepositoryTestDB(t)
 	record := model.ProjectTemplate{Name: "Go service"}
 	require.NoError(t, db.Create(&record).Error)
+	rule := model.ProjectTemplateReviewRule{TemplateID: record.ID, Name: "rule", GlobPatterns: []byte(`["*.go"]`), Content: "content", Enabled: true}
+	require.NoError(t, db.Create(&rule).Error)
 	repo := NewProjectTemplateRepository(db)
 
 	err := repo.DeleteProjectTemplates(context.Background(), []uint{record.ID})
@@ -65,6 +67,10 @@ func TestProjectTemplateRepositoryDeletesTemplates(t *testing.T) {
 	require.NoError(t, err)
 	_, err = repo.FindProjectTemplateByID(context.Background(), record.ID)
 	require.ErrorIs(t, err, service.ErrProjectTemplateNotFound)
+
+	var count int64
+	require.NoError(t, db.Model(&model.ProjectTemplateReviewRule{}).Where("template_id = ?", record.ID).Count(&count).Error)
+	require.Zero(t, count)
 }
 
 func TestProjectTemplateRepositoryListsTemplates(t *testing.T) {
@@ -111,6 +117,6 @@ func openProjectTemplateRepositoryTestDB(t *testing.T) *gorm.DB {
 
 	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:%s?mode=memory&cache=private", t.Name())), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&model.ProjectTemplate{}, &model.Project{}))
+	require.NoError(t, db.AutoMigrate(&model.ProjectTemplate{}, &model.ProjectTemplateReviewRule{}, &model.Project{}))
 	return db
 }
