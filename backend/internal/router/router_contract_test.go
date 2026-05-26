@@ -260,6 +260,13 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 			expectedStatus = http.StatusOK
 		case "/api/v1/admin/system/config/base-url":
 			expectedStatus = http.StatusBadRequest
+		case "/api/v1/admin/stats",
+			"/api/v1/admin/member/commit-summary":
+			expectedStatus = http.StatusBadRequest
+		case "/api/v1/admin/sys-log/get":
+			expectedStatus = http.StatusBadRequest
+		case "/api/v1/admin/sys-log/search":
+			expectedStatus = http.StatusOK
 		}
 		require.Equal(t, expectedStatus, w.Code, "%s %s with token", route.method, route.path)
 	}
@@ -281,6 +288,8 @@ func TestAdminProtectedRoutesReturnForbiddenWithoutPermission(t *testing.T) {
 		IMRobotHandler:                   handler.NewIMRobotHandler(&contractIMRobotService{}),
 		MemberIMMappingHandler:           handler.NewMemberIMMappingHandler(&contractMemberIMMappingService{}),
 		SystemHandler:                    handler.NewSystemHandler(&contractSystemService{}),
+		StatsHandler:                     handler.NewStatsHandler(&contractStatsService{}),
+		SysLogHandler:                    handler.NewSysLogHandler(&contractSysLogService{}),
 		OpenReportHandler:                handler.NewOpenReportHandler(&contractOpenReportService{}),
 		WebhookHandler:                   handler.NewWebhookHandler(&contractReviewTaskService{}),
 		RBACHandler:                      handler.NewRBACHandler(&contractRBACService{}),
@@ -316,6 +325,8 @@ func newContractRouter() *gin.Engine {
 		IMRobotHandler:                   handler.NewIMRobotHandler(&contractIMRobotService{}),
 		MemberIMMappingHandler:           handler.NewMemberIMMappingHandler(&contractMemberIMMappingService{}),
 		SystemHandler:                    handler.NewSystemHandler(&contractSystemService{}),
+		StatsHandler:                     handler.NewStatsHandler(&contractStatsService{}),
+		SysLogHandler:                    handler.NewSysLogHandler(&contractSysLogService{}),
 		OpenReportHandler:                handler.NewOpenReportHandler(&contractOpenReportService{}),
 		WebhookHandler:                   handler.NewWebhookHandler(&contractReviewTaskService{}),
 		RBACHandler:                      handler.NewRBACHandler(&contractRBACService{}),
@@ -634,6 +645,26 @@ func (s *contractSystemService) GetConfig(ctx context.Context) (*service.SystemC
 
 func (s *contractSystemService) UpdateBaseURL(ctx context.Context, baseURL string) (*service.SystemConfig, error) {
 	return nil, service.ErrInvalidSystemConfigInput
+}
+
+type contractStatsService struct{}
+
+func (s *contractStatsService) GetStats(ctx context.Context, query service.StatsRange) (*service.StatsOverview, error) {
+	return &service.StatsOverview{}, nil
+}
+
+func (s *contractStatsService) GetMemberCommitSummary(ctx context.Context, query service.MemberCommitSummaryQuery) (*service.MemberCommitStatsPage, error) {
+	return &service.MemberCommitStatsPage{Items: []service.MemberCommitStats{}, Page: 1, Size: 20}, nil
+}
+
+type contractSysLogService struct{}
+
+func (s *contractSysLogService) Get(ctx context.Context, id uint) (*service.SysLog, error) {
+	return nil, service.ErrInvalidSysLogInput
+}
+
+func (s *contractSysLogService) Search(ctx context.Context, query service.SysLogSearchQuery) (*service.SysLogPage, error) {
+	return &service.SysLogPage{Items: []service.SysLog{}, Page: 1, Size: 20}, nil
 }
 
 type contractReviewTaskService struct{}

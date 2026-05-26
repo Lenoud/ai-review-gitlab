@@ -28,6 +28,8 @@ type Dependencies struct {
 	IMRobotHandler                   *handler.IMRobotHandler
 	MemberIMMappingHandler           *handler.MemberIMMappingHandler
 	SystemHandler                    *handler.SystemHandler
+	StatsHandler                     *handler.StatsHandler
+	SysLogHandler                    *handler.SysLogHandler
 	OpenReportHandler                *handler.OpenReportHandler
 	WebhookHandler                   *handler.WebhookHandler
 	RBACHandler                      *handler.RBACHandler
@@ -76,16 +78,23 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 	registerMemberIMMappingRoutes(admin, deps.MemberIMMappingHandler)
 	registerRBACRoutes(admin, deps.RBACHandler)
 	registerSystemRoutes(admin, deps.SystemHandler)
+	registerStatsRoutes(admin, deps.StatsHandler)
+	registerSysLogRoutes(admin, deps.SysLogHandler)
 	registerRoutes(admin, []routeDef{
 		{http.MethodPost, "/im-robot/test-webhook", "im-robot:write"},
 
 		{http.MethodPost, "/project-analysis-plan-execution-log/test-run", "project-analysis-plan:write"},
-
-		{http.MethodGet, "/stats", "stats:read"},
-		{http.MethodGet, "/member/commit-summary", "stats:read"},
-		{http.MethodGet, "/sys-log/get", "sys-log:read"},
-		{http.MethodGet, "/sys-log/search", "sys-log:read"},
 	})
+}
+
+func registerStatsRoutes(group *gin.RouterGroup, statsHandler *handler.StatsHandler) {
+	group.GET("/stats", middleware.RequirePermission("stats:read"), statsHandler.GetStats)
+	group.GET("/member/commit-summary", middleware.RequirePermission("stats:read"), statsHandler.MemberCommitSummary)
+}
+
+func registerSysLogRoutes(group *gin.RouterGroup, sysLogHandler *handler.SysLogHandler) {
+	group.GET("/sys-log/get", middleware.RequirePermission("sys-log:read"), sysLogHandler.Get)
+	group.GET("/sys-log/search", middleware.RequirePermission("sys-log:read"), sysLogHandler.Search)
 }
 
 func registerSystemRoutes(group *gin.RouterGroup, systemHandler *handler.SystemHandler) {
