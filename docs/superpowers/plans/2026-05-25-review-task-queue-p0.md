@@ -50,30 +50,29 @@ Defer:
 
 ### Task 1: Service Contract
 
-- [ ] Write failing tests for push webhook dedupe, MR webhook dedupe, unknown project rejection, and failed task retry scheduling.
-- [ ] Run `go test ./internal/service -run 'ReviewTask|Webhook' -count=1` and verify it fails.
-- [ ] Implement service DTOs, dedupe key generation, and task status transitions.
-- [ ] Run service tests and verify they pass.
+- [x] Write failing tests for push webhook dedupe, MR webhook dedupe, unknown project rejection, and failed task retry scheduling.
+- [x] Run `go test ./internal/service -run 'ReviewTask|Webhook' -count=1` and verify it fails.
+- [x] Implement service DTOs, dedupe key generation, and task status transitions.
+- [x] Run service tests and verify they pass.
 
 ### Task 2: Repository And Model
 
-- [ ] Write failing repository tests with sqlite for create-or-get duplicate, claim pending task, attempt creation, succeeded, failed retry, and failed final state.
-- [ ] Run `go test ./internal/repository -run ReviewTask -count=1` and verify it fails.
-- [ ] Implement models and GORM repository.
-- [ ] Run repository tests and verify they pass.
+- [x] Write failing repository tests with sqlite for create-or-get duplicate, claim pending task, attempt creation, succeeded, failed retry, and failed final state.
+- [x] Run `go test ./internal/repository -run ReviewTask -count=1` and verify it fails.
+- [x] Implement models and GORM repository.
+- [x] Run repository tests and verify they pass.
 
 ### Task 3: Webhook Handler
 
-- [ ] Write failing handler tests for push and merge request payloads.
-- [ ] Run `go test ./internal/handler -run Webhook -count=1` and verify it fails.
-- [ ] Implement `WebhookHandler`.
-- [ ] Run handler tests and verify they pass.
+- [x] Write failing handler tests for push and merge request payloads.
+- [x] Run `go test ./internal/handler -run Webhook -count=1` and verify it fails.
+- [x] Implement `WebhookHandler`.
+- [x] Run handler tests and verify they pass.
 
 ### Task 4: Router And Runtime
 
-- [ ] Move `/review/webhook` from generic `501` to the injected `WebhookHandler`.
-- [ ] Wire repository/service/handler in `cmd/server`.
-- [ ] Add AutoMigrate models and SQL migration.
-- [ ] Run `go test ./...`.
-- [ ] Commit with the project commit-message style.
-
+- [x] Move `/review/webhook` from generic `501` to the injected `WebhookHandler`.
+- [x] Wire repository/service/handler in `cmd/server`.
+- [x] Add AutoMigrate models and SQL migration.
+- [x] Run `go test ./...`.
+- [x] Commit with the project commit-message style.
