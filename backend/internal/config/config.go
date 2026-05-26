@@ -52,10 +52,11 @@ type LogConfig struct {
 }
 
 type WorkerConfig struct {
-	Enabled       bool   `mapstructure:"enabled"`
-	ID            string `mapstructure:"id"`
-	IdleInterval  string `mapstructure:"idle_interval"`
-	ErrorInterval string `mapstructure:"error_interval"`
+	Enabled        bool   `mapstructure:"enabled"`
+	ID             string `mapstructure:"id"`
+	IdleInterval   string `mapstructure:"idle_interval"`
+	ErrorInterval  string `mapstructure:"error_interval"`
+	MaxInputTokens int    `mapstructure:"max_input_tokens"`
 }
 
 func Load() (*Config, error) {
@@ -90,6 +91,7 @@ func Load() (*Config, error) {
 	v.SetDefault("worker.id", "review-worker-1")
 	v.SetDefault("worker.idle_interval", "5s")
 	v.SetDefault("worker.error_interval", "30s")
+	v.SetDefault("worker.max_input_tokens", 10000)
 
 	_ = v.ReadInConfig()
 

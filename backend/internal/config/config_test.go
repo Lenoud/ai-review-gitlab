@@ -24,6 +24,7 @@ func TestLoadDefaults(t *testing.T) {
 	require.Equal(t, "review-worker-1", cfg.Worker.ID)
 	require.Equal(t, "5s", cfg.Worker.IdleInterval)
 	require.Equal(t, "30s", cfg.Worker.ErrorInterval)
+	require.Equal(t, 10000, cfg.Worker.MaxInputTokens)
 }
 
 func TestLoadEnvOverridesForDatabaseAndAdmin(t *testing.T) {
@@ -52,6 +53,7 @@ func TestLoadEnvOverridesForWorker(t *testing.T) {
 	t.Setenv("WORKER_ID", "worker-test")
 	t.Setenv("WORKER_IDLE_INTERVAL", "1s")
 	t.Setenv("WORKER_ERROR_INTERVAL", "2s")
+	t.Setenv("WORKER_MAX_INPUT_TOKENS", "1234")
 
 	cfg, err := Load()
 
@@ -60,4 +62,5 @@ func TestLoadEnvOverridesForWorker(t *testing.T) {
 	require.Equal(t, "worker-test", cfg.Worker.ID)
 	require.Equal(t, "1s", cfg.Worker.IdleInterval)
 	require.Equal(t, "2s", cfg.Worker.ErrorInterval)
+	require.Equal(t, 1234, cfg.Worker.MaxInputTokens)
 }

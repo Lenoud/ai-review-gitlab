@@ -31,3 +31,4 @@ worker:
   id: review-worker-1
   idle_interval: 5s
   error_interval: 30s
+  max_input_tokens: 10000

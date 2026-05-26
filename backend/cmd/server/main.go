@@ -82,6 +82,7 @@ func main() {
 			llm.NewOpenAICompatibleClient(nil),
 			repository.NewReviewLogRepository(db),
 			repository.NewAIReviewTraceRepository(db),
+			service.ReviewWorkerOptions{MaxInputTokens: cfg.Worker.MaxInputTokens},
 		)
 		workerRunner = worker.NewRunner(reviewWorkerSvc, worker.RunnerOptions{
 			WorkerID:      cfg.Worker.ID,

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -89,6 +90,48 @@ func TestReviewWorkerProcessNextHandlesPushTask(t *testing.T) {
 	require.Equal(t, "review ok", traces.last.Response)
 	require.Equal(t, "openai", traces.last.Provider)
 	require.Equal(t, "gpt-test", traces.last.ModelCode)
+}
+
+func TestReviewWorkerProcessNextTruncatesPromptByConfiguredTokenLimit(t *testing.T) {
+	tasks := &fakeWorkerTaskRunner{
+		task: &ReviewTask{
+			ID:          13,
+			ProjectID:   7,
+			EventType:   ReviewTaskEventPush,
+			PayloadJSON: []byte(`{"project":{"id":123,"web_url":"https://gitlab.example.com/group/repo"},"after":"abc123"}`),
+		},
+	}
+	projects := &fakeWorkerProjectRepo{
+		project: &Project{
+			ID:                   7,
+			Name:                 "repo",
+			WebURL:               "https://gitlab.example.com/group/repo",
+			AccessToken:          "project-token",
+			ReviewPromptTemplate: "项目 {{projectName}} 请检查。",
+		},
+	}
+	models := &fakeWorkerLLMModelRepo{
+		model: &LLMModel{
+			ModelCode:  "gpt-test",
+			APIBaseURL: "https://llm.example.com/v1",
+			APIKey:     "llm-key",
+			MaxTokens:  2048,
+		},
+	}
+	gitlab := &fakeWorkerGitLabClient{
+		commitDiff: []GitLabDiff{{NewPath: "main.go", Diff: strings.Repeat("+very-large-change ", 400)}},
+	}
+	llm := &fakeWorkerLLMClient{response: "review ok"}
+	worker := NewReviewWorkerService(tasks, projects, models, gitlab, llm, nil, nil, ReviewWorkerOptions{MaxInputTokens: 180})
+
+	result, err := worker.ProcessNext(context.Background(), "worker-1")
+
+	require.NoError(t, err)
+	require.True(t, result.Processed)
+	require.LessOrEqual(t, CountReviewTokens(llm.lastPrompt), 200)
+	require.Contains(t, llm.lastPrompt, "总分:XX分")
+	require.Contains(t, llm.lastPrompt, "[内容已按 token 上限截断]")
+	require.NotContains(t, llm.lastPrompt, strings.Repeat("+very-large-change ", 400))
 }
 
 func TestReviewWorkerProcessNextHandlesMergeRequestTask(t *testing.T) {

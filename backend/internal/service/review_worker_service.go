@@ -59,14 +59,19 @@ type ReviewWorkerResult struct {
 	ReviewText string `json:"reviewText,omitempty"`
 }
 
+type ReviewWorkerOptions struct {
+	MaxInputTokens int
+}
+
 type ReviewWorkerService struct {
-	tasks    ReviewWorkerTaskRunner
-	projects ReviewWorkerProjectRepository
-	models   ReviewWorkerLLMModelRepository
-	gitlab   GitLabClient
-	llm      LLMChatClient
-	logs     ReviewWorkerLogWriter
-	traces   ReviewWorkerTraceWriter
+	tasks          ReviewWorkerTaskRunner
+	projects       ReviewWorkerProjectRepository
+	models         ReviewWorkerLLMModelRepository
+	gitlab         GitLabClient
+	llm            LLMChatClient
+	logs           ReviewWorkerLogWriter
+	traces         ReviewWorkerTraceWriter
+	maxInputTokens int
 }
 
 func NewReviewWorkerService(
@@ -77,15 +82,21 @@ func NewReviewWorkerService(
 	llm LLMChatClient,
 	logs ReviewWorkerLogWriter,
 	traces ReviewWorkerTraceWriter,
+	options ...ReviewWorkerOptions,
 ) *ReviewWorkerService {
+	opts := ReviewWorkerOptions{}
+	if len(options) > 0 {
+		opts = options[0]
+	}
 	return &ReviewWorkerService{
-		tasks:    tasks,
-		projects: projects,
-		models:   models,
-		gitlab:   gitlab,
-		llm:      llm,
-		logs:     logs,
-		traces:   traces,
+		tasks:          tasks,
+		projects:       projects,
+		models:         models,
+		gitlab:         gitlab,
+		llm:            llm,
+		logs:           logs,
+		traces:         traces,
+		maxInputTokens: opts.MaxInputTokens,
 	}
 }
 
@@ -132,7 +143,7 @@ func (s *ReviewWorkerService) processClaimedTask(ctx context.Context, task *Revi
 	}
 	messages := []LLMChatMessage{
 		{Role: "system", Content: "你是一个严谨的代码审查助手。请基于 diff 给出问题、风险和建议。"},
-		{Role: "user", Content: buildReviewPrompt(project, payload, diff)},
+		{Role: "user", Content: buildReviewPrompt(project, payload, diff, s.maxInputTokens)},
 	}
 	reviewText, err := s.llm.Chat(ctx, LLMChatInput{
 		APIBaseURL: model.APIBaseURL,
@@ -367,16 +378,17 @@ func gitLabBaseURL(webURL string) (string, error) {
 	return parsed.Scheme + "://" + parsed.Host, nil
 }
 
-func buildReviewPrompt(project *Project, payload *reviewWorkerPayload, diff []GitLabDiff) string {
+func buildReviewPrompt(project *Project, payload *reviewWorkerPayload, diff []GitLabDiff, maxInputTokens int) string {
 	template := strings.TrimSpace(project.ReviewPromptTemplate)
 	if template == "" {
 		template = defaultReviewPromptTemplate
 	}
 	return AssembleReviewPrompt(ReviewPromptAssembleInput{
-		Template:    template,
-		Diffs:       renderGitLabDiffs(diff),
-		Commits:     payload.CommitMessages,
-		ProjectName: project.Name,
+		Template:       template,
+		Diffs:          renderGitLabDiffs(diff),
+		Commits:        payload.CommitMessages,
+		ProjectName:    project.Name,
+		MaxInputTokens: maxInputTokens,
 	})
 }
 
