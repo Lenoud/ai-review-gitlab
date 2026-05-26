@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -38,6 +39,13 @@ func TestPublicRoutesAreRegistered(t *testing.T) {
 		r.ServeHTTP(w, req)
 		require.NotEqual(t, http.StatusNotFound, w.Code, "%s %s", tt.method, tt.path)
 	}
+}
+
+func TestRouterDoesNotWireGenericNotImplementedRoutes(t *testing.T) {
+	source, err := os.ReadFile("router.go")
+	require.NoError(t, err)
+
+	require.NotContains(t, string(source), "handler.NotImplemented")
 }
 
 func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T) {

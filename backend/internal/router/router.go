@@ -1,18 +1,10 @@
 package router
 
 import (
-	"net/http"
-
 	"github.com/Lenoud/ai-review-gitlab/backend/internal/handler"
 	"github.com/Lenoud/ai-review-gitlab/backend/internal/middleware"
 	"github.com/gin-gonic/gin"
 )
-
-type routeDef struct {
-	method     string
-	path       string
-	permission string
-}
 
 type Dependencies struct {
 	AuthHandler                      *handler.AuthHandler
@@ -212,19 +204,4 @@ func registerLLMModelRoutes(group *gin.RouterGroup, llmModelHandler *handler.LLM
 	group.GET("/llm-model/default", middleware.RequirePermission("llm-model:read"), llmModelHandler.Default)
 	group.POST("/llm-model/set-default", middleware.RequirePermission("llm-model:write"), llmModelHandler.SetDefault)
 	group.POST("/llm-test/connection", middleware.RequirePermission("llm-model:write"), llmModelHandler.TestConnection)
-}
-
-func registerRoutes(group *gin.RouterGroup, routes []routeDef) {
-	for _, route := range routes {
-		handlers := []gin.HandlerFunc{handler.NotImplemented}
-		if route.permission != "" {
-			handlers = append([]gin.HandlerFunc{middleware.RequirePermission(route.permission)}, handlers...)
-		}
-		switch route.method {
-		case http.MethodGet:
-			group.GET(route.path, handlers...)
-		case http.MethodPost:
-			group.POST(route.path, handlers...)
-		}
-	}
 }
