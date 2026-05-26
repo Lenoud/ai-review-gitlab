@@ -20,6 +20,11 @@ type ProjectService interface {
 	Delete(ctx context.Context, ids []uint) error
 	Search(ctx context.Context, query service.ProjectSearchQuery) (*service.ProjectPage, error)
 	WebURLExists(ctx context.Context, webURL string, excludeID uint) (bool, error)
+	GetReviewPrompt(ctx context.Context, id uint) (*service.ReviewPrompt, error)
+	GetDefaultReviewPrompt(ctx context.Context) *service.ReviewPrompt
+	UpdateReviewPrompt(ctx context.Context, input service.ReviewPromptUpdateInput) (*service.ReviewPrompt, error)
+	DeleteReviewPrompt(ctx context.Context, id uint) error
+	TestReviewPrompt(ctx context.Context, input service.ReviewPromptTestInput) (*service.ReviewPromptTestResult, error)
 }
 
 type ProjectHandler struct {
@@ -133,6 +138,73 @@ func (h *ProjectHandler) WebURLExists(c *gin.Context) {
 	response.Success(c, gin.H{"exists": exists})
 }
 
+func (h *ProjectHandler) GetReviewPrompt(c *gin.Context) {
+	id, ok := parseUintQuery(c, "id")
+	if !ok {
+		response.BadRequest(c, "项目ID不能为空")
+		return
+	}
+	prompt, err := h.projects.GetReviewPrompt(c.Request.Context(), id)
+	if err != nil {
+		writeProjectError(c, err)
+		return
+	}
+	response.Success(c, prompt)
+}
+
+func (h *ProjectHandler) GetDefaultReviewPrompt(c *gin.Context) {
+	response.Success(c, h.projects.GetDefaultReviewPrompt(c.Request.Context()))
+}
+
+func (h *ProjectHandler) UpdateReviewPrompt(c *gin.Context) {
+	var req reviewPromptUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Review提示词参数错误")
+		return
+	}
+	prompt, err := h.projects.UpdateReviewPrompt(c.Request.Context(), service.ReviewPromptUpdateInput{
+		ProjectID:      req.ID,
+		PromptTemplate: req.PromptTemplate,
+	})
+	if err != nil {
+		writeProjectError(c, err)
+		return
+	}
+	response.Success(c, prompt)
+}
+
+func (h *ProjectHandler) DeleteReviewPrompt(c *gin.Context) {
+	var req idRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.ID == 0 {
+		response.BadRequest(c, "项目ID不能为空")
+		return
+	}
+	if err := h.projects.DeleteReviewPrompt(c.Request.Context(), req.ID); err != nil {
+		writeProjectError(c, err)
+		return
+	}
+	response.Success(c, gin.H{"deleted": true})
+}
+
+func (h *ProjectHandler) TestReviewPrompt(c *gin.Context) {
+	var req reviewPromptTestRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Review提示词参数错误")
+		return
+	}
+	result, err := h.projects.TestReviewPrompt(c.Request.Context(), service.ReviewPromptTestInput{
+		ProjectID:      req.ProjectID,
+		PromptTemplate: req.PromptTemplate,
+		Diffs:          req.Diffs,
+		Commits:        req.Commits,
+	})
+	if err != nil {
+		writeProjectError(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
 func writeProjectError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, service.ErrInvalidProjectInput):
@@ -195,9 +267,25 @@ type deleteRequest struct {
 	IDs []uint `json:"ids"`
 }
 
+type idRequest struct {
+	ID uint `json:"id"`
+}
+
 type webURLExistsRequest struct {
 	WebURL    string `json:"webUrl"`
 	ExcludeID uint   `json:"excludeId"`
+}
+
+type reviewPromptUpdateRequest struct {
+	ID             uint   `json:"id"`
+	PromptTemplate string `json:"promptTemplate"`
+}
+
+type reviewPromptTestRequest struct {
+	ProjectID      uint   `json:"projectId"`
+	PromptTemplate string `json:"promptTemplate"`
+	Diffs          string `json:"diffs"`
+	Commits        string `json:"commits"`
 }
 
 func parseUintQuery(c *gin.Context, key string) (uint, bool) {

@@ -104,14 +104,85 @@ func TestProjectHandlerWebURLExists(t *testing.T) {
 	require.Equal(t, true, data["exists"])
 }
 
+func TestProjectHandlerReviewPromptRoutes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	projectSvc := &fakeProjectService{
+		getReviewPrompt: func(ctx context.Context, id uint) (*service.ReviewPrompt, error) {
+			require.Equal(t, uint(1), id)
+			return &service.ReviewPrompt{ProjectID: 1, PromptTemplate: "custom", Customized: true}, nil
+		},
+		getDefaultReviewPrompt: func(ctx context.Context) *service.ReviewPrompt {
+			return &service.ReviewPrompt{PromptTemplate: "default"}
+		},
+		updateReviewPrompt: func(ctx context.Context, input service.ReviewPromptUpdateInput) (*service.ReviewPrompt, error) {
+			require.Equal(t, uint(1), input.ProjectID)
+			require.Equal(t, "custom", input.PromptTemplate)
+			return &service.ReviewPrompt{ProjectID: 1, PromptTemplate: "custom", Customized: true}, nil
+		},
+		deleteReviewPrompt: func(ctx context.Context, id uint) error {
+			require.Equal(t, uint(1), id)
+			return nil
+		},
+		testReviewPrompt: func(ctx context.Context, input service.ReviewPromptTestInput) (*service.ReviewPromptTestResult, error) {
+			require.Equal(t, uint(1), input.ProjectID)
+			require.Equal(t, "项目 {{projectName}}", input.PromptTemplate)
+			return &service.ReviewPromptTestResult{RenderedPrompt: "项目 AI Review", CharacterCount: len("项目 AI Review"), HasRequiredVariables: true}, nil
+		},
+	}
+	handler := NewProjectHandler(projectSvc)
+	r := gin.New()
+	r.GET("/project/review-prompt/get", handler.GetReviewPrompt)
+	r.GET("/project/review-prompt/default", handler.GetDefaultReviewPrompt)
+	r.POST("/project/review-prompt/update", handler.UpdateReviewPrompt)
+	r.POST("/project/review-prompt/delete", handler.DeleteReviewPrompt)
+	r.POST("/project/review-prompt/test", handler.TestReviewPrompt)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/project/review-prompt/get?id=1", nil)
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/project/review-prompt/default", nil)
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/project/review-prompt/update", strings.NewReader(`{"id":1,"promptTemplate":"custom"}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/project/review-prompt/delete", strings.NewReader(`{"id":1}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/project/review-prompt/test", strings.NewReader(`{"projectId":1,"promptTemplate":"项目 {{projectName}}"}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	data := body["data"].(map[string]any)
+	require.Equal(t, "项目 AI Review", data["renderedPrompt"])
+}
+
 type fakeProjectService struct {
-	create       func(context.Context, service.ProjectInput) (*service.Project, error)
-	batchCreate  func(context.Context, []service.ProjectInput) ([]service.Project, error)
-	update       func(context.Context, uint, service.ProjectInput) (*service.Project, error)
-	get          func(context.Context, uint) (*service.Project, error)
-	delete       func(context.Context, []uint) error
-	search       func(context.Context, service.ProjectSearchQuery) (*service.ProjectPage, error)
-	webURLExists func(context.Context, string, uint) (bool, error)
+	create                 func(context.Context, service.ProjectInput) (*service.Project, error)
+	batchCreate            func(context.Context, []service.ProjectInput) ([]service.Project, error)
+	update                 func(context.Context, uint, service.ProjectInput) (*service.Project, error)
+	get                    func(context.Context, uint) (*service.Project, error)
+	delete                 func(context.Context, []uint) error
+	search                 func(context.Context, service.ProjectSearchQuery) (*service.ProjectPage, error)
+	webURLExists           func(context.Context, string, uint) (bool, error)
+	getReviewPrompt        func(context.Context, uint) (*service.ReviewPrompt, error)
+	getDefaultReviewPrompt func(context.Context) *service.ReviewPrompt
+	updateReviewPrompt     func(context.Context, service.ReviewPromptUpdateInput) (*service.ReviewPrompt, error)
+	deleteReviewPrompt     func(context.Context, uint) error
+	testReviewPrompt       func(context.Context, service.ReviewPromptTestInput) (*service.ReviewPromptTestResult, error)
 }
 
 func (s *fakeProjectService) Create(ctx context.Context, input service.ProjectInput) (*service.Project, error) {
@@ -134,4 +205,19 @@ func (s *fakeProjectService) Search(ctx context.Context, query service.ProjectSe
 }
 func (s *fakeProjectService) WebURLExists(ctx context.Context, webURL string, excludeID uint) (bool, error) {
 	return s.webURLExists(ctx, webURL, excludeID)
+}
+func (s *fakeProjectService) GetReviewPrompt(ctx context.Context, id uint) (*service.ReviewPrompt, error) {
+	return s.getReviewPrompt(ctx, id)
+}
+func (s *fakeProjectService) GetDefaultReviewPrompt(ctx context.Context) *service.ReviewPrompt {
+	return s.getDefaultReviewPrompt(ctx)
+}
+func (s *fakeProjectService) UpdateReviewPrompt(ctx context.Context, input service.ReviewPromptUpdateInput) (*service.ReviewPrompt, error) {
+	return s.updateReviewPrompt(ctx, input)
+}
+func (s *fakeProjectService) DeleteReviewPrompt(ctx context.Context, id uint) error {
+	return s.deleteReviewPrompt(ctx, id)
+}
+func (s *fakeProjectService) TestReviewPrompt(ctx context.Context, input service.ReviewPromptTestInput) (*service.ReviewPromptTestResult, error) {
+	return s.testReviewPrompt(ctx, input)
 }

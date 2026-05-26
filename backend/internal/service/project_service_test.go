@@ -88,6 +88,72 @@ func TestProjectServiceSearchAndURLExists(t *testing.T) {
 	require.True(t, exists)
 }
 
+func TestProjectServiceReviewPromptGetUpdateDeleteAndDefault(t *testing.T) {
+	repo := newMemoryProjectRepository(&Project{
+		ID:                   1,
+		Name:                 "AI Review",
+		WebURL:               "https://gitlab.example.com/group/ai-review",
+		Platform:             ProjectPlatformGitLab,
+		ReviewPromptTemplate: "custom prompt",
+	})
+	svc := NewProjectService(repo)
+
+	prompt, err := svc.GetReviewPrompt(context.Background(), 1)
+	require.NoError(t, err)
+	require.Equal(t, "custom prompt", prompt.PromptTemplate)
+	require.True(t, prompt.Customized)
+
+	defaultPrompt := svc.GetDefaultReviewPrompt(context.Background())
+	require.Contains(t, defaultPrompt.PromptTemplate, "资深的软件开发工程师")
+
+	updated, err := svc.UpdateReviewPrompt(context.Background(), ReviewPromptUpdateInput{
+		ProjectID:      1,
+		PromptTemplate: " updated prompt ",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "updated prompt", updated.PromptTemplate)
+	require.Equal(t, "updated prompt", repo.projects[1].ReviewPromptTemplate)
+
+	require.NoError(t, svc.DeleteReviewPrompt(context.Background(), 1))
+	require.Empty(t, repo.projects[1].ReviewPromptTemplate)
+
+	prompt, err = svc.GetReviewPrompt(context.Background(), 1)
+	require.NoError(t, err)
+	require.False(t, prompt.Customized)
+	require.Equal(t, defaultPrompt.PromptTemplate, prompt.PromptTemplate)
+}
+
+func TestProjectServiceReviewPromptTestRendersPreview(t *testing.T) {
+	repo := newMemoryProjectRepository(&Project{ID: 1, Name: "AI Review", WebURL: "https://gitlab.example.com/group/ai-review"})
+	svc := NewProjectService(repo)
+
+	result, err := svc.TestReviewPrompt(context.Background(), ReviewPromptTestInput{
+		ProjectID:      1,
+		PromptTemplate: "项目 {{projectName}} 请检查。",
+		Diffs:          "diff --git a/main.go b/main.go",
+		Commits:        "fix auth",
+	})
+
+	require.NoError(t, err)
+	require.Contains(t, result.RenderedPrompt, "项目 AI Review 请检查。")
+	require.Contains(t, result.RenderedPrompt, "代码变更内容")
+	require.Contains(t, result.RenderedPrompt, "diff --git a/main.go b/main.go")
+	require.Contains(t, result.RenderedPrompt, "总分:XX分")
+	require.Equal(t, len(result.RenderedPrompt), result.CharacterCount)
+	require.True(t, result.HasRequiredVariables)
+	require.Empty(t, result.MissingVariables)
+}
+
+func TestProjectServiceReviewPromptRejectsInvalidInput(t *testing.T) {
+	svc := NewProjectService(newMemoryProjectRepository())
+
+	_, err := svc.UpdateReviewPrompt(context.Background(), ReviewPromptUpdateInput{ProjectID: 1})
+	require.ErrorIs(t, err, ErrInvalidProjectInput)
+
+	_, err = svc.TestReviewPrompt(context.Background(), ReviewPromptTestInput{})
+	require.ErrorIs(t, err, ErrInvalidProjectInput)
+}
+
 type memoryProjectRepository struct {
 	projects map[uint]*Project
 	nextID   uint

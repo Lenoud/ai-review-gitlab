@@ -161,8 +161,14 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 			"/api/v1/admin/project/search",
 			"/api/v1/admin/project/gitlab/remote-search",
 			"/api/v1/admin/project/gitlab/group-search",
-			"/api/v1/admin/project/web-urls/exists":
+			"/api/v1/admin/project/web-urls/exists",
+			"/api/v1/admin/project/review-prompt/get",
+			"/api/v1/admin/project/review-prompt/update",
+			"/api/v1/admin/project/review-prompt/delete",
+			"/api/v1/admin/project/review-prompt/test":
 			expectedStatus = http.StatusBadRequest
+		case "/api/v1/admin/project/review-prompt/default":
+			expectedStatus = http.StatusOK
 		case "/api/v1/admin/llm-model/create",
 			"/api/v1/admin/llm-model/update",
 			"/api/v1/admin/llm-model/get",
@@ -280,6 +286,26 @@ func (s *contractProjectService) Search(ctx context.Context, query service.Proje
 
 func (s *contractProjectService) WebURLExists(ctx context.Context, webURL string, excludeID uint) (bool, error) {
 	return false, service.ErrInvalidProjectInput
+}
+
+func (s *contractProjectService) GetReviewPrompt(ctx context.Context, id uint) (*service.ReviewPrompt, error) {
+	return nil, service.ErrInvalidProjectInput
+}
+
+func (s *contractProjectService) GetDefaultReviewPrompt(ctx context.Context) *service.ReviewPrompt {
+	return &service.ReviewPrompt{PromptTemplate: "default"}
+}
+
+func (s *contractProjectService) UpdateReviewPrompt(ctx context.Context, input service.ReviewPromptUpdateInput) (*service.ReviewPrompt, error) {
+	return nil, service.ErrInvalidProjectInput
+}
+
+func (s *contractProjectService) DeleteReviewPrompt(ctx context.Context, id uint) error {
+	return service.ErrInvalidProjectInput
+}
+
+func (s *contractProjectService) TestReviewPrompt(ctx context.Context, input service.ReviewPromptTestInput) (*service.ReviewPromptTestResult, error) {
+	return nil, service.ErrInvalidProjectInput
 }
 
 type contractProjectGitLabService struct{}

@@ -60,12 +60,6 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 	registerReviewLogRoutes(admin, deps.ReviewLogHandler)
 	registerAIReviewTraceRoutes(admin, deps.AIReviewTraceHandler)
 	registerRoutes(admin, []routeDef{
-		{http.MethodGet, "/project/review-prompt/get"},
-		{http.MethodGet, "/project/review-prompt/default"},
-		{http.MethodPost, "/project/review-prompt/update"},
-		{http.MethodPost, "/project/review-prompt/delete"},
-		{http.MethodPost, "/project/review-prompt/test"},
-
 		{http.MethodPost, "/im-robot/create"},
 		{http.MethodPost, "/im-robot/update"},
 		{http.MethodGet, "/im-robot/get"},
@@ -153,6 +147,11 @@ func registerProjectRoutes(group *gin.RouterGroup, projectHandler *handler.Proje
 	group.POST("/project/delete", projectHandler.Delete)
 	group.GET("/project/search", projectHandler.Search)
 	group.POST("/project/web-urls/exists", projectHandler.WebURLExists)
+	group.GET("/project/review-prompt/get", projectHandler.GetReviewPrompt)
+	group.GET("/project/review-prompt/default", projectHandler.GetDefaultReviewPrompt)
+	group.POST("/project/review-prompt/update", projectHandler.UpdateReviewPrompt)
+	group.POST("/project/review-prompt/delete", projectHandler.DeleteReviewPrompt)
+	group.POST("/project/review-prompt/test", projectHandler.TestReviewPrompt)
 }
 
 func registerProjectGitLabRoutes(group *gin.RouterGroup, gitLabHandler *handler.ProjectGitLabHandler) {
