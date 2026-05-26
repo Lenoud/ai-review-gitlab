@@ -215,6 +215,13 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 			expectedStatus = http.StatusBadRequest
 		case "/api/v1/admin/project-analysis-plan/search":
 			expectedStatus = http.StatusOK
+		case "/api/v1/admin/project-template/create",
+			"/api/v1/admin/project-template/update",
+			"/api/v1/admin/project-template/get",
+			"/api/v1/admin/project-template/delete":
+			expectedStatus = http.StatusBadRequest
+		case "/api/v1/admin/project-template/list":
+			expectedStatus = http.StatusOK
 		}
 		require.Equal(t, expectedStatus, w.Code, "%s %s with token", route.method, route.path)
 	}
@@ -223,16 +230,17 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 func TestAdminProtectedRoutesReturnForbiddenWithoutPermission(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := New(Dependencies{
-		AuthHandler:          NewAuthHandlerForTest(),
-		ProjectHandler:       handler.NewProjectHandler(&contractProjectService{}),
-		ProjectGitLabHandler: handler.NewProjectGitLabHandler(&contractProjectGitLabService{}),
-		AnalysisPlanHandler:  handler.NewProjectAnalysisPlanHandler(&contractProjectAnalysisPlanService{}),
-		LLMModelHandler:      handler.NewLLMModelHandler(&contractLLMModelService{}),
-		ReviewLogHandler:     handler.NewReviewLogHandler(&contractReviewLogService{}),
-		AnalysisLogHandler:   handler.NewAnalysisExecutionLogHandler(&contractAnalysisExecutionLogService{}),
-		AIReviewTraceHandler: handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
-		OpenReportHandler:    handler.NewOpenReportHandler(&contractOpenReportService{}),
-		RBACHandler:          handler.NewRBACHandler(&contractRBACService{}),
+		AuthHandler:            NewAuthHandlerForTest(),
+		ProjectHandler:         handler.NewProjectHandler(&contractProjectService{}),
+		ProjectGitLabHandler:   handler.NewProjectGitLabHandler(&contractProjectGitLabService{}),
+		ProjectTemplateHandler: handler.NewProjectTemplateHandler(&contractProjectTemplateService{}),
+		AnalysisPlanHandler:    handler.NewProjectAnalysisPlanHandler(&contractProjectAnalysisPlanService{}),
+		LLMModelHandler:        handler.NewLLMModelHandler(&contractLLMModelService{}),
+		ReviewLogHandler:       handler.NewReviewLogHandler(&contractReviewLogService{}),
+		AnalysisLogHandler:     handler.NewAnalysisExecutionLogHandler(&contractAnalysisExecutionLogService{}),
+		AIReviewTraceHandler:   handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
+		OpenReportHandler:      handler.NewOpenReportHandler(&contractOpenReportService{}),
+		RBACHandler:            handler.NewRBACHandler(&contractRBACService{}),
 		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
 			subject: &service.AuthSubject{
 				UserID:   2,
@@ -252,16 +260,17 @@ func TestAdminProtectedRoutesReturnForbiddenWithoutPermission(t *testing.T) {
 
 func newContractRouter() *gin.Engine {
 	return New(Dependencies{
-		AuthHandler:          NewAuthHandlerForTest(),
-		ProjectHandler:       handler.NewProjectHandler(&contractProjectService{}),
-		ProjectGitLabHandler: handler.NewProjectGitLabHandler(&contractProjectGitLabService{}),
-		AnalysisPlanHandler:  handler.NewProjectAnalysisPlanHandler(&contractProjectAnalysisPlanService{}),
-		LLMModelHandler:      handler.NewLLMModelHandler(&contractLLMModelService{}),
-		ReviewLogHandler:     handler.NewReviewLogHandler(&contractReviewLogService{}),
-		AnalysisLogHandler:   handler.NewAnalysisExecutionLogHandler(&contractAnalysisExecutionLogService{}),
-		AIReviewTraceHandler: handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
-		OpenReportHandler:    handler.NewOpenReportHandler(&contractOpenReportService{}),
-		RBACHandler:          handler.NewRBACHandler(&contractRBACService{}),
+		AuthHandler:            NewAuthHandlerForTest(),
+		ProjectHandler:         handler.NewProjectHandler(&contractProjectService{}),
+		ProjectGitLabHandler:   handler.NewProjectGitLabHandler(&contractProjectGitLabService{}),
+		ProjectTemplateHandler: handler.NewProjectTemplateHandler(&contractProjectTemplateService{}),
+		AnalysisPlanHandler:    handler.NewProjectAnalysisPlanHandler(&contractProjectAnalysisPlanService{}),
+		LLMModelHandler:        handler.NewLLMModelHandler(&contractLLMModelService{}),
+		ReviewLogHandler:       handler.NewReviewLogHandler(&contractReviewLogService{}),
+		AnalysisLogHandler:     handler.NewAnalysisExecutionLogHandler(&contractAnalysisExecutionLogService{}),
+		AIReviewTraceHandler:   handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
+		OpenReportHandler:      handler.NewOpenReportHandler(&contractOpenReportService{}),
+		RBACHandler:            handler.NewRBACHandler(&contractRBACService{}),
 		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
 			subject: &service.AuthSubject{
 				UserID:   1,
@@ -378,6 +387,28 @@ func (s *contractProjectGitLabService) SearchProjects(ctx context.Context, input
 
 func (s *contractProjectGitLabService) SearchGroups(ctx context.Context, input service.GitLabSearchInput) ([]service.GitLabGroup, error) {
 	return nil, service.ErrInvalidGitLabInput
+}
+
+type contractProjectTemplateService struct{}
+
+func (s *contractProjectTemplateService) Create(ctx context.Context, input service.ProjectTemplateInput) (*service.ProjectTemplate, error) {
+	return nil, service.ErrInvalidProjectTemplateInput
+}
+
+func (s *contractProjectTemplateService) Update(ctx context.Context, id uint, input service.ProjectTemplateInput) (*service.ProjectTemplate, error) {
+	return nil, service.ErrInvalidProjectTemplateInput
+}
+
+func (s *contractProjectTemplateService) Get(ctx context.Context, id uint) (*service.ProjectTemplate, error) {
+	return nil, service.ErrInvalidProjectTemplateInput
+}
+
+func (s *contractProjectTemplateService) Delete(ctx context.Context, ids []uint) error {
+	return service.ErrInvalidProjectTemplateInput
+}
+
+func (s *contractProjectTemplateService) List(ctx context.Context, query service.ProjectTemplateListQuery) ([]service.ProjectTemplate, error) {
+	return []service.ProjectTemplate{}, nil
 }
 
 type contractProjectAnalysisPlanService struct{}
