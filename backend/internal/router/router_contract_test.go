@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -48,7 +49,22 @@ func TestRouterDoesNotWireGenericNotImplementedRoutes(t *testing.T) {
 	require.NotContains(t, string(source), "handler.NotImplemented")
 }
 
-func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T) {
+func TestRouterDoesNotKeepLegacyNotImplementedHandlers(t *testing.T) {
+	files, err := filepath.Glob("../handler/*.go")
+	require.NoError(t, err)
+
+	for _, file := range files {
+		if strings.HasSuffix(file, "_test.go") {
+			continue
+		}
+
+		source, err := os.ReadFile(file)
+		require.NoError(t, err)
+		require.NotContains(t, string(source), "func NotImplemented", file)
+	}
+}
+
+func TestAdminRoutesRequireAuthAndReturnExpectedStatusWithDevToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := newContractRouter()
 
@@ -157,7 +173,7 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 		req = httptest.NewRequest(route.method, route.path, strings.NewReader(route.body))
 		req.Header.Set("Authorization", "Bearer access-token")
 		r.ServeHTTP(w, req)
-		expectedStatus := http.StatusNotImplemented
+		expectedStatus := 0
 		switch route.path {
 		case "/api/v1/admin/auth/me":
 			expectedStatus = http.StatusOK
@@ -279,6 +295,7 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 		case "/api/v1/admin/sys-log/search":
 			expectedStatus = http.StatusOK
 		}
+		require.NotZero(t, expectedStatus, "missing expected status for %s %s", route.method, route.path)
 		require.Equal(t, expectedStatus, w.Code, "%s %s with token", route.method, route.path)
 	}
 }
