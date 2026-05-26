@@ -63,6 +63,7 @@ func main() {
 	aiReviewTraceSvc := service.NewAIReviewTraceService(repository.NewAIReviewTraceRepository(db))
 	openReportSvc := service.NewOpenReportService(repository.NewReviewLogRepository(db))
 	llmModelSvc := service.NewLLMModelService(repository.NewLLMModelRepository(db), llm.NewOpenAICompatibleChecker(nil))
+	rbacSvc := service.NewRBACService(repository.NewUserRepository(db))
 	workerCtx, stopWorker := context.WithCancel(context.Background())
 	var workerRunner *worker.Runner
 	if cfg.Worker.Enabled {
@@ -106,6 +107,7 @@ func main() {
 	aiReviewTraceHandler := handler.NewAIReviewTraceHandler(aiReviewTraceSvc)
 	openReportHandler := handler.NewOpenReportHandler(openReportSvc)
 	webhookHandler := handler.NewWebhookHandler(reviewTaskSvc)
+	rbacHandler := handler.NewRBACHandler(rbacSvc)
 	r := router.New(router.Dependencies{
 		AuthHandler:          authHandler,
 		ProjectHandler:       projectHandler,
@@ -115,6 +117,7 @@ func main() {
 		AIReviewTraceHandler: aiReviewTraceHandler,
 		OpenReportHandler:    openReportHandler,
 		WebhookHandler:       webhookHandler,
+		RBACHandler:          rbacHandler,
 		AuthMiddleware:       middleware.JWTAuth(authSvc),
 	})
 	if err := r.Run(cfg.Server.Address()); err != nil {

@@ -153,6 +153,9 @@ func TestAdminRoutesRequireAuthAndReturnNotImplementedWithDevToken(t *testing.T)
 		switch route.path {
 		case "/api/v1/admin/auth/me":
 			expectedStatus = http.StatusOK
+		case "/api/v1/admin/role/list",
+			"/api/v1/admin/role/menu-permissions":
+			expectedStatus = http.StatusOK
 		case "/api/v1/admin/project/create",
 			"/api/v1/admin/project/batch-create",
 			"/api/v1/admin/project/update",
@@ -212,6 +215,7 @@ func TestAdminProtectedRoutesReturnForbiddenWithoutPermission(t *testing.T) {
 		ReviewLogHandler:     handler.NewReviewLogHandler(&contractReviewLogService{}),
 		AIReviewTraceHandler: handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
 		OpenReportHandler:    handler.NewOpenReportHandler(&contractOpenReportService{}),
+		RBACHandler:          handler.NewRBACHandler(&contractRBACService{}),
 		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
 			subject: &service.AuthSubject{
 				UserID:   2,
@@ -238,6 +242,7 @@ func newContractRouter() *gin.Engine {
 		ReviewLogHandler:     handler.NewReviewLogHandler(&contractReviewLogService{}),
 		AIReviewTraceHandler: handler.NewAIReviewTraceHandler(&contractAIReviewTraceService{}),
 		OpenReportHandler:    handler.NewOpenReportHandler(&contractOpenReportService{}),
+		RBACHandler:          handler.NewRBACHandler(&contractRBACService{}),
 		AuthMiddleware: middleware.JWTAuth(&contractTokenValidator{
 			subject: &service.AuthSubject{
 				UserID:   1,
@@ -284,6 +289,16 @@ func (v *contractTokenValidator) ValidateAccessToken(ctx context.Context, token 
 		return nil, service.ErrInvalidToken
 	}
 	return v.subject, nil
+}
+
+type contractRBACService struct{}
+
+func (s *contractRBACService) ListRoles(ctx context.Context) ([]service.Role, error) {
+	return []service.Role{}, nil
+}
+
+func (s *contractRBACService) ListPermissionGroups(ctx context.Context) ([]service.PermissionGroup, error) {
+	return []service.PermissionGroup{}, nil
 }
 
 type contractProjectService struct{}
@@ -447,6 +462,10 @@ func (s *contractReviewLogService) GetShareToken(ctx context.Context, eventType 
 type contractOpenReportService struct{}
 
 func (s *contractOpenReportService) CodeReviewReport(ctx context.Context, input service.CodeReviewReportInput) (string, error) {
+	return "", service.ErrInvalidReviewLogInput
+}
+
+func (s *contractOpenReportService) AnalysisReport(ctx context.Context, input service.AnalysisReportInput) (string, error) {
 	return "", service.ErrInvalidReviewLogInput
 }
 

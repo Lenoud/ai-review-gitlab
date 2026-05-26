@@ -23,6 +23,7 @@ type Dependencies struct {
 	AIReviewTraceHandler *handler.AIReviewTraceHandler
 	OpenReportHandler    *handler.OpenReportHandler
 	WebhookHandler       *handler.WebhookHandler
+	RBACHandler          *handler.RBACHandler
 	AuthMiddleware       gin.HandlerFunc
 }
 
@@ -45,7 +46,7 @@ func registerPublicRoutes(r *gin.Engine, deps Dependencies) {
 		open.POST("/auth/logout", deps.AuthHandler.Logout)
 		open.GET("/system/info", handler.SystemInfo)
 		open.GET("/code-review-report", deps.OpenReportHandler.CodeReviewReport)
-		open.GET("/analysis-report", handler.NotImplemented)
+		open.GET("/analysis-report", deps.OpenReportHandler.AnalysisReport)
 	}
 
 	r.POST("/review/webhook", deps.WebhookHandler.GitLab)
@@ -60,6 +61,7 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 	registerLLMModelRoutes(admin, deps.LLMModelHandler)
 	registerReviewLogRoutes(admin, deps.ReviewLogHandler)
 	registerAIReviewTraceRoutes(admin, deps.AIReviewTraceHandler)
+	registerRBACRoutes(admin, deps.RBACHandler)
 	registerRoutes(admin, []routeDef{
 		{http.MethodPost, "/im-robot/create", "im-robot:write"},
 		{http.MethodPost, "/im-robot/update", "im-robot:write"},
@@ -102,12 +104,10 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 		{http.MethodGet, "/user/get", "rbac:read"},
 		{http.MethodGet, "/user/search", "rbac:read"},
 		{http.MethodGet, "/user/role-options", "rbac:read"},
-		{http.MethodGet, "/role/list", "rbac:read"},
 		{http.MethodPost, "/role/create", "rbac:write"},
 		{http.MethodPost, "/role/update", "rbac:write"},
 		{http.MethodGet, "/role/get", "rbac:read"},
 		{http.MethodPost, "/role/delete", "rbac:write"},
-		{http.MethodGet, "/role/menu-permissions", "rbac:read"},
 
 		{http.MethodGet, "/stats", "stats:read"},
 		{http.MethodGet, "/member/commit-summary", "stats:read"},
@@ -117,6 +117,11 @@ func registerAdminRoutes(r *gin.Engine, deps Dependencies) {
 		{http.MethodGet, "/system/config", "system:read"},
 		{http.MethodPost, "/system/config/base-url", "system:write"},
 	})
+}
+
+func registerRBACRoutes(group *gin.RouterGroup, rbacHandler *handler.RBACHandler) {
+	group.GET("/role/list", middleware.RequirePermission("rbac:read"), rbacHandler.ListRoles)
+	group.GET("/role/menu-permissions", middleware.RequirePermission("rbac:read"), rbacHandler.MenuPermissions)
 }
 
 func registerReviewLogRoutes(group *gin.RouterGroup, reviewLogHandler *handler.ReviewLogHandler) {

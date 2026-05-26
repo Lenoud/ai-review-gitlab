@@ -134,6 +134,18 @@ func (r *ReviewLogRepository) FindMergeRequestByID(ctx context.Context, id uint)
 	return mergeRequestReviewLogModelToService(&record), nil
 }
 
+func (r *ReviewLogRepository) FindAnalysisExecutionByID(ctx context.Context, id uint) (*service.ProjectAnalysisPlanExecutionLog, error) {
+	var record model.ProjectAnalysisPlanExecutionLog
+	err := r.db.WithContext(ctx).First(&record, id).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, service.ErrReviewLogNotFound
+		}
+		return nil, err
+	}
+	return analysisExecutionLogModelToService(&record), nil
+}
+
 func (r *ReviewLogRepository) SearchMergeRequest(ctx context.Context, query service.ReviewLogSearchQuery) (*service.MergeRequestReviewLogPage, error) {
 	db := applyCommonReviewLogFilters(r.db.WithContext(ctx).Model(&model.MergeRequestReviewLog{}), query)
 	if query.Branch != "" {
@@ -379,6 +391,23 @@ func mergeRequestReviewLogModelToService(record *model.MergeRequestReviewLog) *s
 		ReviewResult:        record.ReviewResult,
 		ShareToken:          record.ShareToken,
 		ShareTokenExpiresAt: record.ShareTokenExpiresAt,
+		CreatedAt:           record.CreatedAt.UnixMilli(),
+		UpdatedAt:           record.UpdatedAt.UnixMilli(),
+	}
+}
+
+func analysisExecutionLogModelToService(record *model.ProjectAnalysisPlanExecutionLog) *service.ProjectAnalysisPlanExecutionLog {
+	return &service.ProjectAnalysisPlanExecutionLog{
+		ID:                  record.ID,
+		PlanID:              record.PlanID,
+		ProjectID:           record.ProjectID,
+		Status:              record.Status,
+		ResultContent:       record.ResultContent,
+		ShareToken:          record.ShareToken,
+		ShareTokenExpiresAt: record.ShareTokenExpiresAt,
+		StartedAt:           record.StartedAt,
+		CompletedAt:         record.CompletedAt,
+		DurationMs:          record.DurationMs,
 		CreatedAt:           record.CreatedAt.UnixMilli(),
 		UpdatedAt:           record.UpdatedAt.UnixMilli(),
 	}

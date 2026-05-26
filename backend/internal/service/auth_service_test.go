@@ -79,6 +79,31 @@ func TestAuthServiceRejectsInvalidCredentials(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidCredentials)
 }
 
+func TestRBACServiceListsRolesAndPermissionGroups(t *testing.T) {
+	repo := &memoryRBACRepository{
+		roles: []Role{
+			{ID: 1, Code: "admin", Name: "管理员"},
+		},
+		permissionGroups: []PermissionGroup{
+			{
+				Category: "project",
+				Permissions: []Permission{
+					{ID: 1, Code: "project:read", Name: "查看项目", Category: "project"},
+				},
+			},
+		},
+	}
+	svc := NewRBACService(repo)
+
+	roles, err := svc.ListRoles(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, repo.roles, roles)
+
+	groups, err := svc.ListPermissionGroups(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, repo.permissionGroups, groups)
+}
+
 type memoryUserRepository struct {
 	byID       map[uint]*User
 	byUsername map[string]*User
@@ -110,4 +135,17 @@ func (r *memoryUserRepository) FindByID(ctx context.Context, id uint) (*User, er
 		return nil, ErrUserNotFound
 	}
 	return user, nil
+}
+
+type memoryRBACRepository struct {
+	roles            []Role
+	permissionGroups []PermissionGroup
+}
+
+func (r *memoryRBACRepository) ListRoles(ctx context.Context) ([]Role, error) {
+	return r.roles, nil
+}
+
+func (r *memoryRBACRepository) ListPermissionGroups(ctx context.Context) ([]PermissionGroup, error) {
+	return r.permissionGroups, nil
 }

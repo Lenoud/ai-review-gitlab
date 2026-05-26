@@ -13,6 +13,7 @@ import (
 
 type OpenReportService interface {
 	CodeReviewReport(ctx context.Context, input service.CodeReviewReportInput) (string, error)
+	AnalysisReport(ctx context.Context, input service.AnalysisReportInput) (string, error)
 }
 
 type OpenReportHandler struct {
@@ -33,6 +34,30 @@ func (h *OpenReportHandler) CodeReviewReport(c *gin.Context) {
 		LogID:   uint(logID),
 		LogType: c.Query("logType"),
 		Token:   c.Query("token"),
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrInvalidReviewLogInput):
+			c.Status(http.StatusBadRequest)
+		case errors.Is(err, service.ErrReviewLogNotFound):
+			c.Status(http.StatusNotFound)
+		default:
+			c.Status(http.StatusInternalServerError)
+		}
+		return
+	}
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
+}
+
+func (h *OpenReportHandler) AnalysisReport(c *gin.Context) {
+	logID, err := strconv.ParseUint(strings.TrimSpace(c.Query("logId")), 10, 64)
+	if err != nil || logID == 0 {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	html, err := h.reports.AnalysisReport(c.Request.Context(), service.AnalysisReportInput{
+		LogID: uint(logID),
+		Token: c.Query("token"),
 	})
 	if err != nil {
 		switch {

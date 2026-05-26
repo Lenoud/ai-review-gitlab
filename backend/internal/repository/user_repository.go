@@ -41,6 +41,48 @@ func (r *UserRepository) FindByID(ctx context.Context, id uint) (*service.User, 
 	return r.toServiceUser(ctx, &user)
 }
 
+func (r *UserRepository) ListRoles(ctx context.Context) ([]service.Role, error) {
+	var records []model.SysRole
+	if err := r.db.WithContext(ctx).Order("code ASC").Find(&records).Error; err != nil {
+		return nil, err
+	}
+	roles := make([]service.Role, 0, len(records))
+	for _, record := range records {
+		roles = append(roles, service.Role{
+			ID:   record.ID,
+			Code: record.Code,
+			Name: record.Name,
+		})
+	}
+	return roles, nil
+}
+
+func (r *UserRepository) ListPermissionGroups(ctx context.Context) ([]service.PermissionGroup, error) {
+	var records []model.SysPermission
+	if err := r.db.WithContext(ctx).Order("category ASC, code ASC").Find(&records).Error; err != nil {
+		return nil, err
+	}
+
+	groups := make([]service.PermissionGroup, 0)
+	indexByCategory := map[string]int{}
+	for _, record := range records {
+		category := record.Category
+		index, ok := indexByCategory[category]
+		if !ok {
+			index = len(groups)
+			indexByCategory[category] = index
+			groups = append(groups, service.PermissionGroup{Category: category})
+		}
+		groups[index].Permissions = append(groups[index].Permissions, service.Permission{
+			ID:       record.ID,
+			Code:     record.Code,
+			Name:     record.Name,
+			Category: record.Category,
+		})
+	}
+	return groups, nil
+}
+
 func (r *UserRepository) toServiceUser(ctx context.Context, user *model.SysUser) (*service.User, error) {
 	roles, err := r.findRoleCodes(ctx, user.ID)
 	if err != nil {

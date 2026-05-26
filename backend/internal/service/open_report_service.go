@@ -14,9 +14,30 @@ type CodeReviewReportInput struct {
 	Token   string
 }
 
+type AnalysisReportInput struct {
+	LogID uint
+	Token string
+}
+
+type ProjectAnalysisPlanExecutionLog struct {
+	ID                  uint   `json:"id"`
+	PlanID              uint   `json:"planId"`
+	ProjectID           uint   `json:"projectId"`
+	Status              string `json:"status"`
+	ResultContent       string `json:"resultContent"`
+	ShareToken          string `json:"shareToken"`
+	ShareTokenExpiresAt int64  `json:"shareTokenExpiresAt"`
+	StartedAt           time.Time
+	CompletedAt         time.Time
+	DurationMs          int64 `json:"durationMs"`
+	CreatedAt           int64 `json:"createdAt"`
+	UpdatedAt           int64 `json:"updatedAt"`
+}
+
 type OpenReportRepository interface {
 	FindPushByID(ctx context.Context, id uint) (*PushReviewLog, error)
 	FindMergeRequestByID(ctx context.Context, id uint) (*MergeRequestReviewLog, error)
+	FindAnalysisExecutionByID(ctx context.Context, id uint) (*ProjectAnalysisPlanExecutionLog, error)
 }
 
 type OpenReportService struct {
@@ -56,6 +77,21 @@ func (s *OpenReportService) CodeReviewReport(ctx context.Context, input CodeRevi
 	default:
 		return "", ErrInvalidReviewLogInput
 	}
+}
+
+func (s *OpenReportService) AnalysisReport(ctx context.Context, input AnalysisReportInput) (string, error) {
+	input.Token = strings.TrimSpace(input.Token)
+	if input.LogID == 0 || input.Token == "" {
+		return "", ErrInvalidReviewLogInput
+	}
+	log, err := s.logs.FindAnalysisExecutionByID(ctx, input.LogID)
+	if err != nil {
+		return "", err
+	}
+	if !validShareToken(input.Token, log.ShareToken, log.ShareTokenExpiresAt, s.now()) {
+		return "", ErrReviewLogNotFound
+	}
+	return buildAnalysisReportHTML(log), nil
 }
 
 func validShareToken(inputToken string, storedToken string, expiresAt int64, now time.Time) bool {
@@ -137,5 +173,48 @@ func buildCodeReviewReportHTML(view codeReviewReportView) string {
 		view.Additions,
 		view.Deletions,
 		html.EscapeString(strings.TrimSpace(view.ReviewResult)),
+	)
+}
+
+func buildAnalysisReportHTML(log *ProjectAnalysisPlanExecutionLog) string {
+	return fmt.Sprintf(`<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Analysis Report</title>
+  <style>
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5f7fb;color:#172033}
+    main{max-width:960px;margin:0 auto;padding:40px 20px}
+    header{border-bottom:1px solid #d9e0ee;padding-bottom:20px;margin-bottom:24px}
+    h1{font-size:28px;line-height:1.2;margin:0 0 8px}
+    .meta{color:#667085;font-size:14px}
+    .stats{display:flex;gap:12px;flex-wrap:wrap;margin:24px 0}
+    .stat{background:#fff;border:1px solid #d9e0ee;border-radius:8px;padding:14px 18px;min-width:110px}
+    .label{font-size:12px;color:#667085;margin-bottom:6px}
+    .value{font-size:20px;font-weight:700}
+    article{background:#fff;border:1px solid #d9e0ee;border-radius:8px;padding:20px;white-space:pre-wrap;line-height:1.65}
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>AI Analysis Report</h1>
+      <div class="meta">Project #%d · Plan #%d · %s</div>
+    </header>
+    <section class="stats">
+      <div class="stat"><div class="label">状态</div><div class="value">%s</div></div>
+      <div class="stat"><div class="label">耗时</div><div class="value">%d ms</div></div>
+    </section>
+    <article>%s</article>
+  </main>
+</body>
+</html>`,
+		log.ProjectID,
+		log.PlanID,
+		html.EscapeString(log.CompletedAt.Format(time.RFC3339)),
+		html.EscapeString(log.Status),
+		log.DurationMs,
+		html.EscapeString(strings.TrimSpace(log.ResultContent)),
 	)
 }

@@ -69,6 +69,50 @@ func TestUserRepositoryFindsUserWithRolesAndPermissions(t *testing.T) {
 	require.ElementsMatch(t, []string{"review-log:read", "project:write"}, got.Permissions)
 }
 
+func TestUserRepositoryListsRolesInCodeOrder(t *testing.T) {
+	db := openUserRepositoryTestDB(t)
+	require.NoError(t, db.Create(&model.SysRole{Code: "reviewer", Name: "审查员"}).Error)
+	require.NoError(t, db.Create(&model.SysRole{Code: "admin", Name: "管理员"}).Error)
+
+	repo := NewUserRepository(db)
+
+	roles, err := repo.ListRoles(context.Background())
+
+	require.NoError(t, err)
+	require.Equal(t, []service.Role{
+		{ID: 2, Code: "admin", Name: "管理员"},
+		{ID: 1, Code: "reviewer", Name: "审查员"},
+	}, roles)
+}
+
+func TestUserRepositoryListsPermissionsGroupedByCategory(t *testing.T) {
+	db := openUserRepositoryTestDB(t)
+	require.NoError(t, db.Create(&model.SysPermission{Code: "project:write", Name: "管理项目", Category: "project"}).Error)
+	require.NoError(t, db.Create(&model.SysPermission{Code: "project:read", Name: "查看项目", Category: "project"}).Error)
+	require.NoError(t, db.Create(&model.SysPermission{Code: "rbac:read", Name: "查看权限", Category: "rbac"}).Error)
+
+	repo := NewUserRepository(db)
+
+	groups, err := repo.ListPermissionGroups(context.Background())
+
+	require.NoError(t, err)
+	require.Equal(t, []service.PermissionGroup{
+		{
+			Category: "project",
+			Permissions: []service.Permission{
+				{ID: 2, Code: "project:read", Name: "查看项目", Category: "project"},
+				{ID: 1, Code: "project:write", Name: "管理项目", Category: "project"},
+			},
+		},
+		{
+			Category: "rbac",
+			Permissions: []service.Permission{
+				{ID: 3, Code: "rbac:read", Name: "查看权限", Category: "rbac"},
+			},
+		},
+	}, groups)
+}
+
 func openUserRepositoryTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 

@@ -54,9 +54,36 @@ func TestOpenReportServiceRejectsExpiredOrMismatchedToken(t *testing.T) {
 	require.ErrorIs(t, err, ErrReviewLogNotFound)
 }
 
+func TestOpenReportServiceBuildsAnalysisHTMLWhenTokenValid(t *testing.T) {
+	logs := &fakeOpenReportRepository{
+		analysis: &ProjectAnalysisPlanExecutionLog{
+			ID:                  21,
+			ProjectID:           7,
+			PlanID:              3,
+			Status:              "succeeded",
+			ResultContent:       "整体趋势稳定\n<script>alert(1)</script>",
+			ShareToken:          "analysis-token",
+			ShareTokenExpiresAt: time.Now().Add(time.Hour).UnixMilli(),
+			StartedAt:           time.Date(2026, 5, 26, 10, 0, 0, 0, time.UTC),
+			CompletedAt:         time.Date(2026, 5, 26, 10, 2, 0, 0, time.UTC),
+			DurationMs:          120000,
+		},
+	}
+	svc := NewOpenReportService(logs)
+
+	html, err := svc.AnalysisReport(context.Background(), AnalysisReportInput{LogID: 21, Token: "analysis-token"})
+
+	require.NoError(t, err)
+	require.Contains(t, html, "AI Analysis Report")
+	require.Contains(t, html, "整体趋势稳定")
+	require.NotContains(t, html, "<script>")
+	require.Contains(t, html, "&lt;script&gt;alert(1)&lt;/script&gt;")
+}
+
 type fakeOpenReportRepository struct {
-	push  *PushReviewLog
-	merge *MergeRequestReviewLog
+	push     *PushReviewLog
+	merge    *MergeRequestReviewLog
+	analysis *ProjectAnalysisPlanExecutionLog
 }
 
 func (r *fakeOpenReportRepository) FindPushByID(ctx context.Context, id uint) (*PushReviewLog, error) {
@@ -72,5 +99,13 @@ func (r *fakeOpenReportRepository) FindMergeRequestByID(ctx context.Context, id 
 		return nil, ErrReviewLogNotFound
 	}
 	copy := *r.merge
+	return &copy, nil
+}
+
+func (r *fakeOpenReportRepository) FindAnalysisExecutionByID(ctx context.Context, id uint) (*ProjectAnalysisPlanExecutionLog, error) {
+	if r.analysis == nil || r.analysis.ID != id {
+		return nil, ErrReviewLogNotFound
+	}
+	copy := *r.analysis
 	return &copy, nil
 }
