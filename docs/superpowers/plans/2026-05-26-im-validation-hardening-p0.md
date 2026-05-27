@@ -41,4 +41,4 @@
 - [x] Run non-network package suite after formatting.
 - [x] Run compile-only all-package check after formatting.
 - [x] Run `git diff --check` after formatting.
-- [ ] Commit the coherent validation hardening change.
+- [x] Commit the coherent validation hardening change.
